@@ -1,14 +1,12 @@
-
-
 import _ from 'lodash';
 import utils from './utils';
 import EventDispatcher from './utils/EventDispatcher';
 
-var VERSION = 0;
+const VERSION = 0;
 
-//////////////////////////////////////////////////////////////////////////
-/////////////////////     DEFAULT SETTINGS     ///////////////////////////
-//////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
+// DEFAULT SETTINGS
+//----------------------------------------------------------------------------
 
 /**
  * Polygonal complexity settings.
@@ -25,7 +23,7 @@ var VERSION = 0;
  * @alias SettingsObject
  * @namespace
  */
-var defaults = {
+const defaults = {
   /**
    * Default options for all available modes.
    * Use {@link Mode.id} as a dictionary key to access mode options.
@@ -48,9 +46,13 @@ var defaults = {
    * @property {IsoSurfaceSESModeOptions} SE - Solvent Excluded Surface mode options.
    * @property {ContactSurfaceModeOptions} CS - Contact Surface mode options.
    * @property {TextModeOptions} TX - Text mode options.
+   * @property {VolumeDensityModeOptions} VD - Volume Density mode options.
    */
   modes: {
-    /////////////////////    BALLS AND STICKS    ///////////////////////////
+    //----------------------------------------------------------------------------
+    // BALLS AND STICKS
+    //----------------------------------------------------------------------------
+
     /**
      * Balls and Sticks mode options.
      *
@@ -77,11 +79,14 @@ var defaults = {
         low: 4,
         medium: 6,
         high: 12,
-        ultra: 32
-      }
+        ultra: 32,
+      },
     },
 
-    ////////////////////       VAN DER WAALS      //////////////////////////
+    //----------------------------------------------------------------------------
+    // VAN DER WAALS
+    //----------------------------------------------------------------------------
+
     /**
      * Van der Waals mode options.
      *
@@ -95,11 +100,14 @@ var defaults = {
         low: 6,
         medium: 8,
         high: 16,
-        ultra: 32
-      }
+        ultra: 32,
+      },
     },
 
-    ////////////////////           LINES          //////////////////////////
+    //----------------------------------------------------------------------------
+    // LINES
+    //----------------------------------------------------------------------------
+
     /**
      * Lines mode options.
      *
@@ -121,7 +129,10 @@ var defaults = {
       lineWidth: 2,
     },
 
-    ////////////////////         LICORICE         //////////////////////////
+    //----------------------------------------------------------------------------
+    // LICORICE
+    //----------------------------------------------------------------------------
+
     /**
      * Licorice mode options.
      *
@@ -146,11 +157,14 @@ var defaults = {
         low: 4,
         medium: 6,
         high: 12,
-        ultra: 32
-      }
+        ultra: 32,
+      },
     },
 
-    ////////////////////          SURFACE   SAS   //////////////////////////
+    //----------------------------------------------------------------------------
+    // SURFACE SAS
+    //----------------------------------------------------------------------------
+
     /**
      * Solvent Accessible Surface mode options.
      *
@@ -165,7 +179,7 @@ var defaults = {
      */
     SA: {
       zClip: false,
-      probeRadius:1.5,
+      probeRadius: 1.5,
       subset: '',
       wireframe: false,
       polyComplexity: {
@@ -173,11 +187,14 @@ var defaults = {
         low: 8,
         medium: 16,
         high: 30,
-        ultra: 60
+        ultra: 60,
       },
     },
 
-    ////////////////////          SURFACE   SES   //////////////////////////
+    //----------------------------------------------------------------------------
+    // SURFACE SES
+    //----------------------------------------------------------------------------
+
     /**
      * Solvent Excluded Surface mode options.
      *
@@ -192,7 +209,7 @@ var defaults = {
      */
     SE: {
       zClip: false,
-      probeRadius:1.5,
+      probeRadius: 1.5,
       subset: '',
       wireframe: false,
       polyComplexity: {
@@ -200,11 +217,14 @@ var defaults = {
         low: 8,
         medium: 16,
         high: 30,
-        ultra: 60
+        ultra: 60,
       },
     },
 
-    ////////////////////       QUICK SURFACE        //////////////////////////
+    //----------------------------------------------------------------------------
+    // QUICK SURFACE
+    //----------------------------------------------------------------------------
+
     /**
      * Quick Surface mode options.
      *
@@ -227,7 +247,7 @@ var defaults = {
         low: 2.0,
         medium: 2.5,
         high: 3.0,
-        ultra: 4.0
+        ultra: 4.0,
       },
       scale: 1.0,
       wireframe: false,
@@ -236,13 +256,16 @@ var defaults = {
         low: 1.5,
         medium: 1,
         high: 0.5,
-        ultra: 0.25
+        ultra: 0.25,
       },
       subset: '',
-      zClip: false
+      zClip: false,
     },
 
-    ////////////////////      CONTACT SURFACE       //////////////////////////
+    //----------------------------------------------------------------------------
+    // CONTACT SURFACE
+    //----------------------------------------------------------------------------
+
     /**
      * Contact Surface mode options.
      *
@@ -268,13 +291,16 @@ var defaults = {
         low: 1.0,
         medium: 1.5,
         high: 1.75,
-        ultra: 2.0
+        ultra: 2.0,
       },
       subset: '',
-      zClip: false
+      zClip: false,
     },
 
-    ////////////////////           TRACE          //////////////////////////
+    //----------------------------------------------------------------------------
+    // TRACE
+    //----------------------------------------------------------------------------
+
     /**
      * Trace mode options.
      *
@@ -290,11 +316,14 @@ var defaults = {
         low: 16,
         medium: 32,
         high: 64,
-        ultra: 64
-      }
+        ultra: 64,
+      },
     },
 
-    ////////////////////           TUBE           //////////////////////////
+    //----------------------------------------------------------------------------
+    // TUBE
+    //----------------------------------------------------------------------------
+
     /**
      * Tube mode options.
      *
@@ -314,11 +343,14 @@ var defaults = {
         low: 6,
         medium: 10,
         high: 18,
-        ultra: 34
-      }
+        ultra: 34,
+      },
     },
 
-    ////////////////////          CARTOON         //////////////////////////
+    //----------------------------------------------------------------------------
+    // CARTOON
+    //----------------------------------------------------------------------------
+
     /**
      * Cartoon mode options.
      *
@@ -355,11 +387,14 @@ var defaults = {
         low: 6,
         medium: 10,
         high: 18,
-        ultra: 34
-      }
+        ultra: 34,
+      },
     },
 
-    ////////////////////           TEXT           //////////////////////////
+    //----------------------------------------------------------------------------
+    // TEXT
+    //----------------------------------------------------------------------------
+
     /**
      * Text mode options.
      *
@@ -385,8 +420,26 @@ var defaults = {
       dz: 1,
       fg: 'none',
       bg: '0x202020',
-      showBg : true,
-    }
+      showBg: true,
+    },
+
+    //----------------------------------------------------------------------------
+    // VOLUME DENSITY
+    //----------------------------------------------------------------------------
+
+    /**
+     * Volume density mode options.
+     *
+     * @typedef VolumeDensityModeOptions
+     *
+     * @property {number} kSigma - Noise threshold coefficient .
+     *
+     */
+    VD: {
+      kSigma: 1.0,
+      kSigmaMed: 2.0,
+      kSigmaMax: 4.0,
+    },
   },
 
   /**
@@ -411,7 +464,6 @@ var defaults = {
    * @property {HydrophobicityColorerOptions} HY - Hydrophobicity colorer options.
    */
   colorers: {
-    ////////////////////         ATOM TYPE        //////////////////////////
     /**
      * Element colorer options.
      *
@@ -420,10 +472,9 @@ var defaults = {
      * @property {number} carbon - Carbon color or -1 to use default.
      */
     EL: {
-      carbon: -1
+      carbon: -1,
     },
 
-    ////////////////////          UNIFORM         //////////////////////////
     /**
      * Uniform colorer options.
      *
@@ -432,10 +483,9 @@ var defaults = {
      * @property {number} color - Single color to paint with.
      */
     UN: {
-      color: 0xFFFFFF
+      color: 0xFFFFFF,
     },
 
-    ////////////////////        CONDITIONAL       //////////////////////////
     /**
      * Conditional colorer options.
      *
@@ -451,7 +501,6 @@ var defaults = {
       baseColor: 0xFFFFFF,
     },
 
-    ////////////////////          CARBON         //////////////////////////
     /**
      * Carbon colorer options.
      *
@@ -465,7 +514,6 @@ var defaults = {
       factor: 0.6,
     },
 
-    ////////////////////         SEQUENCE         //////////////////////////
     /**
      * Sequence colorer options.
      *
@@ -477,7 +525,6 @@ var defaults = {
       gradient: 'rainbow',
     },
 
-    ////////////////////         TEMPERATURE      //////////////////////////
     /**
      * Temperature colorer options.
      *
@@ -493,7 +540,6 @@ var defaults = {
       max: 40,
     },
 
-    ////////////////////         OCCUPANCY       //////////////////////////
     /**
      * Occupancy colorer options.
      *
@@ -505,7 +551,6 @@ var defaults = {
       gradient: 'reds',
     },
 
-    ////////////////////         HYDROPHOBICITY       //////////////////////////
     /**
      * Hydrophobicity colorer options.
      *
@@ -517,7 +562,6 @@ var defaults = {
       gradient: 'blue-red',
     },
 
-    ////////////////////         MOLECULE      //////////////////////////
     /**
      * Molecule colorer options.
      *
@@ -531,7 +575,7 @@ var defaults = {
   },
 
   /** @deprecated Old-fashioned atom labels, to be removed in the next major version. */
-  labels: 'no',  // can be one of: no, obj, fg, bg.
+  labels: 'no', // can be one of: no, obj, fg, bg.
 
   /*
      * Use antialiasing in WebGL.
@@ -565,14 +609,14 @@ var defaults = {
    * @type {number}
    * @instance
    */
-  fogNearFactor: 0.5, //[0, 1]
+  fogNearFactor: 0.5, // [0, 1]
 
   /**
    * @type {number}
    * @instance
    */
-  fogFarFactor: 1, //[0, 1]
-  fogAlpha : 1.0,
+  fogFarFactor: 1, // [0, 1]
+  fogAlpha: 1.0,
   fogColor: 0x000000,
   fogColorEnable: false,
 
@@ -588,7 +632,7 @@ var defaults = {
      */
   resolution: 'medium',
 
-  autoResolution: false/*true*/,
+  autoResolution: false/* true */,
 
   autoPreset: true,
 
@@ -639,11 +683,11 @@ var defaults = {
     line: {
       color: 0xFFFFFFFF,
       dashSize: 0.3,
-      gapSize: 0.05
-    }
+      gapSize: 0.05,
+    },
   },
 
-  /////////////////////////////////////////////////////////////////
+  //----------------------------------------------------------------------------
 
   /**
    * Theme to use, 'dark' or 'light'.
@@ -655,7 +699,7 @@ var defaults = {
   /** @deprecated Old-fashioned theme paradigma, to be removed in the next major version. */
   themes: {
     dark: 0x202020,
-    light: 0xcccccc
+    light: 0xcccccc,
   },
 
   bg: {
@@ -667,7 +711,7 @@ var defaults = {
     clipPlane: false,
     clipPlaneFactor: 0.5,
     clipPlaneSpeed: 0.00003,
-    waterBondingHack: false
+    waterBondingHack: false,
   },
 
   /*
@@ -726,9 +770,9 @@ var defaults = {
    * @instance
    */
   outline: {
-    on : false,
-    color : 0x000000,
-    threshold : 0.1
+    on: false,
+    color: 0x000000,
+    threshold: 0.1,
   },
 
   /**
@@ -737,6 +781,19 @@ var defaults = {
    * @instance
    */
   ao: false,
+
+  /**
+   * Shadows options.
+   *
+   * @property {boolean} shadowMap - enable/disable.
+   * @property {string} basic/percentage-closer filtering/non-uniform randomizing pcf.
+   * @property {number} radius for percentage-closer filtering.
+   */
+  shadow: {
+    on: false,
+    type: 'random'/* basic, pcf, random */,
+    radius: 1.0,
+  },
 
   /**
    * Auto-rotation with constant speed.
@@ -842,9 +899,9 @@ var defaults = {
   },
 };
 
-  //////////////////////////////////////////////////////////////////////////
-  /////////////////////      SETTINGS CLASS      ///////////////////////////
-  //////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
+// SETTINGS CLASS
+//----------------------------------------------------------------------------
 
 function Settings() {
   EventDispatcher.call(this);
@@ -857,9 +914,9 @@ function Settings() {
 }
 
 utils.deriveClass(Settings, EventDispatcher, {
-  defaults: defaults,
+  defaults,
 
-  set: function(path, value) {
+  set(path, value) {
     if (_.isString(path)) {
       const oldValue = _.get(this.now, path);
       if (oldValue !== value) {
@@ -875,11 +932,11 @@ utils.deriveClass(Settings, EventDispatcher, {
     }
   },
 
-  get: function(path, defaultValue) {
+  get(path, defaultValue) {
     return _.get(this.now, path, defaultValue);
   },
 
-  reset: function() {
+  reset() {
     const diff = utils.objectsDiff(defaults, this.now);
     this.now = _.cloneDeep(defaults);
     this.old = null;
@@ -887,40 +944,37 @@ utils.deriveClass(Settings, EventDispatcher, {
     this._changed = {};
   },
 
-  checkpoint: function() {
+  checkpoint() {
     this.old = _.cloneDeep(this.now);
     this._changed = {};
   },
 
-  _notifyChange: function(path, value) {
+  _notifyChange(path, value) {
     this._changed[path] = true;
-    this.dispatchEvent({type: `change:${path}`, value});
+    this.dispatchEvent({ type: `change:${path}`, value });
   },
 
-  _notifyChanges: function(diff) {
+  _notifyChanges(diff) {
     utils.forInRecursive(diff, (deepValue, deepPath) => {
       this._notifyChange(deepPath, deepValue);
     });
   },
 
-  changed: function() {
+  changed() {
     if (!this.old) {
       return [];
     }
-    var old = this.old;
-    var now = this.now;
-    var keys = _.filter(Object.keys(this._changed), function(key) {
-      return _.get(old, key) !== _.get(now, key);
-    });
+    const { old, now } = this;
+    const keys = _.filter(Object.keys(this._changed), key => _.get(old, key) !== _.get(now, key));
     return keys;
   },
 
   /** @deprecated Use Settings#set instead */
-  override: function(other) {
+  override(other) {
     this.set(other);
   },
 
-  applyDiffs: function(diffs) {
+  applyDiffs(diffs) {
     // TODO Change inequality to >=?
     if (diffs.hasOwnProperty('VERSION') && diffs.VERSION !== VERSION) {
       throw new Error('Settings version does not match!');
@@ -931,15 +985,15 @@ utils.deriveClass(Settings, EventDispatcher, {
     this.set(diffs);
   },
 
-  getDiffs: function(versioned) {
-    var diffs = utils.objectsDiff(this.now, defaults);
+  getDiffs(versioned) {
+    const diffs = utils.objectsDiff(this.now, defaults);
     if (versioned) {
       diffs.VERSION = VERSION;
     }
     return diffs;
   },
 
-  setPluginOpts: function(plugin, opts) {
+  setPluginOpts(plugin, opts) {
     defaults.plugins[plugin] = _.cloneDeep(opts);
     this.now.plugins[plugin] = _.cloneDeep(opts);
   },
@@ -947,4 +1001,3 @@ utils.deriveClass(Settings, EventDispatcher, {
 
 
 export default new Settings();
-

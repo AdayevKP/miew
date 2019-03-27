@@ -30,6 +30,12 @@ export default class Parser {
     });
   }
 
+  // only for volume Parsers
+  getModel() {
+    this.model._parseHeader(this._data);
+    return this.model;
+  }
+
   /** @deprecated */
   _parseOLD(callbacks) {
     return this.parse()
@@ -47,11 +53,10 @@ export default class Parser {
 
   /** @deprecated */
   static checkDataTypeOptions(options, type, extension) {
-    const fileType = options.fileType;
-    const fileName = options.fileName;
-    extension = (extension || ('.' + type)).toLowerCase();
-    return Boolean((fileType && fileType.toLowerCase() === type.toLowerCase()) ||
-      (!fileType && fileName && fileName.toLowerCase().endsWith(extension)));
+    const { fileType, fileName } = options;
+    extension = (extension || (`.${type}`)).toLowerCase();
+    return Boolean((fileType && fileType.toLowerCase() === type.toLowerCase())
+      || (!fileType && fileName && fileName.toLowerCase().endsWith(extension)));
   }
 }
 

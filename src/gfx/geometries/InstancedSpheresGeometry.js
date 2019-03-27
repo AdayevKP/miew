@@ -7,16 +7,16 @@ const tmpColor = new THREE.Color();
 
 const OFFSET_SIZE = 4;
 const COLOR_SIZE = 3;
-const copySubArrays = utils.copySubArrays;
+const { copySubArrays } = utils;
 
 function setArrayXYZ(arr, idx, x, y, z) {
-  arr[idx]     = x;
+  arr[idx] = x;
   arr[idx + 1] = y;
   arr[idx + 2] = z;
 }
 
 function setArrayXYZW(arr, idx, x, y, z, w) {
-  arr[idx]     = x;
+  arr[idx] = x;
   arr[idx + 1] = y;
   arr[idx + 2] = z;
   arr[idx + 3] = w;
@@ -24,8 +24,8 @@ function setArrayXYZW(arr, idx, x, y, z, w) {
 class InstancedSpheresGeometry extends SphereCollisionGeo(THREE.InstancedBufferGeometry) {
   constructor(spheresCount, sphereComplexity, useZSprites) {
     super(spheresCount);
-    this._sphGeometry = useZSprites ? new THREE.PlaneBufferGeometry(2, 2, 1, 1) :
-      new THREE.SphereBufferGeometry(1, sphereComplexity * 2, sphereComplexity, 0, Math.PI * 2, 0, Math.PI);
+    this._sphGeometry = useZSprites ? new THREE.PlaneBufferGeometry(2, 2, 1, 1)
+      : new THREE.SphereBufferGeometry(1, sphereComplexity * 2, sphereComplexity, 0, Math.PI * 2, 0, Math.PI);
     this._init(spheresCount, this._sphGeometry);
   }
 
@@ -82,9 +82,9 @@ class InstancedSpheresGeometry extends SphereCollisionGeo(THREE.InstancedBufferG
     const alpha = this._alpha = utils.allocateTyped(Float32Array, spheresCount);
     _.fill(alpha, 1.0);
 
-    this.addAttribute('offset', new THREE.InstancedBufferAttribute(this._offsets, OFFSET_SIZE, 1));
-    this.addAttribute('color', new THREE.InstancedBufferAttribute(this._colors, COLOR_SIZE, 1));
-    this.addAttribute('alphaColor', new THREE.InstancedBufferAttribute(alpha, 1, 1));
+    this.addAttribute('offset', new THREE.InstancedBufferAttribute(this._offsets, OFFSET_SIZE, false, 1));
+    this.addAttribute('color', new THREE.InstancedBufferAttribute(this._colors, COLOR_SIZE, false, 1));
+    this.addAttribute('alphaColor', new THREE.InstancedBufferAttribute(alpha, 1, false, 1));
   }
 }
 export default InstancedSpheresGeometry;
