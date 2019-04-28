@@ -5,6 +5,8 @@ import chem from '../../chem';
 import SDFStream from './SDFStream';
 import Assembly from '../../chem/Assembly';
 
+import ResiudeSeq from '../../chem/ResidueSeq';
+
 const {
   Complex,
   Element,
@@ -335,6 +337,8 @@ export default class SDFParser extends Parser {
 
     this._finalize();
 
+    const RS = new ResiudeSeq();
+    RS.defineResidues(result);
     return result;
   }
 }
