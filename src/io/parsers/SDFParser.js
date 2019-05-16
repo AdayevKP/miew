@@ -337,8 +337,8 @@ export default class SDFParser extends Parser {
 
     this._finalize();
 
-    const RS = new ResiudeSeq();
-    RS.defineResidues(result);
+    const RS = new ResiudeSeq(result);
+    RS.defineResidues();
     return result;
   }
 }

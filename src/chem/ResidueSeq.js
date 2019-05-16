@@ -1,347 +1,205 @@
+import GraphUtils from '../utils/GraphUtils';
+import FSMachine from '../utils/FSMachine';
 import chem from '../chem';
-import _ from 'lodash';
 
 const {
   Complex,
   Element,
   Bond,
   Molecule,
+  Atom,
 } = chem;
 
-class FSMachine {
-  constructor() {
-    this._curState = 'INITIAL';
-    this._resultWord = [];
-    this._currentSubWord = [];
-    //hardcode FIX IT
-    this._havePatern = false;
+class residue {
 
-    this._states = {
-      INITIAL: this._initialState,
-      N: this._Nstate,
-      NC: this._NCstate,
-      NCC: this._NCCstate,
-      C: this._Cstate,
-      CC: this._CCstate,
-      CCN: this._CCNstate,
-      END: this._ENDstate,
-    };
-  }
-
-  clone() {
-    const clone = new FSMachine();
-    clone._curState = this._curState.slice();
-    clone._resultWord = this._resultWord.slice();
-    clone._currentSubWord = this._currentSubWord.slice();
-    clone._havePatern = this._havePatern;
-    return clone;
-  }
-
-  _changeState(state, Node, drop = false) {
-    if (drop) {
-      this._currentSubWord = [];
-    }
-
-    this._curState = state;
-    if (Node) {
-      this._currentSubWord.push(Node);
-    }
-  }
-
-  _ENDstate(Node) {
-    return false;
-  }
-
-  _initialState(Node) {
-    const name = Node.element.name;
-    const bonds = Node._bonds.length;
-    if (name === 'N' || (name === 'C' && bonds === 3)) {
-      this._changeState(name, Node);
-    }
-    return true;
-  }
-
-  _pushBackResult() {
-    for (let i = 0; i < this._currentSubWord.length; i++) {
-      this._resultWord.push(this._currentSubWord[i]);
-    }
-
-    if (this._resultWord.length >= 3) {
-      this._havePatern = true;
-    }
-  }
-
-  _dropState() {
-    let newState;
-    let res;
-    if (this._havePatern) {
-      newState = 'END';
-      res = false;
-    } else {
-      newState = 'INITIAL';
-      res = true;
-    }
-    this._changeState(newState, null, true);
-    return res;
-  }
-
-  _Nstate(Node) {
-    const name = Node.element.name;
-    const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 4) {
-      this._changeState('NC', Node);
-    } else if (name === 'C' && bonds === 3) {
-      this._changeState('C', Node, true);
-    } else {
-      return this._dropState();
-    }
-    return true;
-  }
-
-  _NCstate(Node) {
-    const name = Node.element.name;
-    const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 3) {
-      this._changeState('NCC', Node);
-    } else {
-      return this._dropState();
-    }
-    return true;
-  }
-
-  _NCCstate(Node) {
-    const name = Node.element.name;
-    if (name === 'N') {
-      this._pushBackResult();
-      this._changeState('N', Node, true);
-    } else {
-      return this._dropState();
-    }
-    return true;
-  }
-
-  _Cstate(Node) {
-    const name = Node.element.name;
-    const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 4) {
-      this._changeState('CC', Node);
-    } else if (name === 'N') {
-      this._changeState('N', Node, true);
-    } else {
-      return this._dropState();
-    }
-    return true;
-  }
-
-  _CCstate(Node) {
-    const name = Node.element.name;
-    if (name === 'N') {
-      this._changeState('CCN', Node);
-    } else {
-      return this._dropState();
-    }
-    return true;
-  }
-
-  _CCNstate(Node) {
-    const name = Node.element.name;
-    const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 3) {
-      this._pushBackResult();
-      this._changeState('C', Node, true);
-    } else {
-      return this._dropState();
-    }
-    return true;
-  }
-
-  eatNode(Node) {
-    const func = this._states[this._curState];
-    if (_.isFunction(func)) {
-      return func.call(this, Node);
-    }
-
-    return false;
-  }
-
-  eatPath(path) {
-    for (let i = 0; i < path.length; i++) {
-      this.eatNode(path[i]);
-    }
-  }
-
-  getResult() {
-    return this._resultWord;
-  }
 }
 
-class GraphUtils {
-  constructor(edges, vertices) {
-    this._edges = edges;
-    this._vertices = vertices;
-    this._endNode = null;
-    this._distances = [];
-    this._vertsQueue = [];
-    this._parents = [];
-    this._startNode = null;
-
-    this._bbone = null;
-
-    this._visited = [];
+export default class ResiudeSeq {
+  constructor(complex) {
+    this._complex = complex;
+    this._backbone = [];
+    this._graph = new GraphUtils(this._complex._bonds, this._complex._atoms);
+    this._residues = null;
   }
 
-  DFS(startNode, endNode = null) {
-    if (!startNode) {
-      return null;
-    }
+  defineResidues() {
+    const path = this._findBackbone();
+    const bbone = this._finalizeBackbone(path);
+    const residues = this._getResidues(bbone);
 
-    this._startNode = startNode;
 
-    this._parents[this._startNode._index] = { node: this._startNode, parent: this._startNode._index };
-    function doDfs(Node, automat) {
-      this._visited[Node._index] = true;
-      const bonds = Node._bonds;
-      for (let i = 0; i < Node._bonds.length; i++) {
-        const nextNode = (bonds[i]._left._index === Node._index) ? bonds[i]._right : bonds[i]._left;
-        const autClone = automat.clone();
-        if (!this._visited[nextNode._index] && autClone.eatNode(nextNode)) {
-          this._distances[nextNode._index] = this._distances[Node._index] + 1;
-          this._parents[nextNode._index] = {node: nextNode, parent: Node._index};
-          doDfs.call(this, nextNode, autClone);
-        }
-      }
-    }
-
-    this._distances = new Array(this._vertices.length).fill(-1);
-    this._visited = new Array(this._vertices.length).fill(false);
-    const automat = new FSMachine();
-    doDfs.call(this, startNode, automat);
-    const maxIndx = this._distances.indexOf(Math.max(...this._distances));
-    return this._vertices.find(V => V._index === maxIndx);
+    this._nameResidues(residues);
+    this._addResidues(residues);
   }
-/*
-  BFS(startNode, endNode = null) {
-    if (!startNode) {
-      return null;
+
+  _tryToFindBackbone(startNode, graph) {
+    const FSM = new FSMachine();
+    const first = graph.DFS(startNode);
+    const second = graph.DFS(first);
+    FSM.eatPath(graph.getPath(second));
+    return FSM.getResult();
+  }
+
+  _isBackbone(path) {
+    if (path.length % 3 !== 0 || path.length === 0) {
+      return false;
     }
 
-    this._startNode = startNode;
+    const FSM = new FSMachine();
+    FSM.eatPath(path);
+    const bbone = FSM.getResult();
 
-    this._distances = new Array(this._vertices.length).fill(-1);
-    this._distances[this._startNode._index] = 0;
-    this._parents[this._startNode._index] = { node: this._startNode, parent: this._startNode._index };
-
-    this._vertsQueue = [];
-    this._vertsQueue.push(startNode);
-    while (this._vertsQueue.length > 0) {
-      const curNode = this._vertsQueue.shift();
-      const bonds = curNode._bonds;
-      for (let i = 0; i < curNode._bonds.length; i++) {
-        const nextNode = (bonds[i]._left._index === curNode._index) ? bonds[i]._right : bonds[i]._left;
-        if (this._distances[nextNode._index] === -1) {
-          this._distances[nextNode._index] = this._distances[curNode._index] + 1;
-          this._parents[nextNode._index] = {node: nextNode, parent: curNode._index};
-          this._vertsQueue.push(nextNode);
-        }
-      }
+    if (path.length !== bbone.length) {
+      return false;
     }
 
-    //pizdec
-    if (endNode) {
-      return this.getPath(endNode);
-    } else {
-      const pathes = this.getAllPathes();
-      const backbonePathes = [];
+    return true;
+  }
 
-      for (let i = 0; i < pathes.length; i++) {
+  _findBackbone() {
+    const graph = this._graph;
+    const atoms = this._complex._atoms;
+    return this._tryToFindBackbone(atoms[0], graph);
+  }
+
+  _finalizeBackbone(path) {
+    let i = 0;
+    const atoms = this._complex._atoms;
+    const graph = this._graph;
+    while (!this._isBackbone(path) && i < atoms.length) {
+      const pathes = graph.getAllPathes();
+      const backbones = [];
+      for (let j = 0; j < pathes.length; j++) {
         const FSM = new FSMachine();
-        FSM.eatPath(pathes[i]);
-        backbonePathes.push(FSM.getResult());
+        FSM.eatPath(pathes[j]);
+        backbones.push(FSM.getResult());
       }
 
-      const lengths = backbonePathes.map(function(a) {
-        return a.length;
-      });
-      const indx = lengths.indexOf(Math.max.apply(Math, lengths));
-
-      this._bbone = backbonePathes[indx];
-      return this._bbone[0];
-      //const maxIndx = this._distances.indexOf(Math.max(...this._distances));
-      //return this._vertices.find(V => V._index === maxIndx);
-    }
-  }
-*/
-
-  getPath(endNode) {
-    let curNode = endNode;
-    if (!curNode) {
-      return null;
+      const lengths = backbones.map(a => a.length);
+      const indx = lengths.indexOf(Math.max(...lengths));
+      path = backbones[indx];
+      i++;
+      this._tryToFindBackbone(atoms[i], graph);
     }
 
-    const path = [];
-    path.push(curNode);
-    let parent;
-    parent = this._parents[curNode._index].parent;
-
-    while (parent !== curNode._index) {
-      curNode = this._parents[parent].node;
-      path.push(curNode);
-      parent = this._parents[curNode._index].parent;
-    }
-
-    path.push(this._parents[parent].node);
+    const res = this._isBackbone(path);
 
     return path;
   }
 
-  getAllPathes() {
-    const pathes = [];
-    const verts = this._vertices;
-    for (let i = 0; i < verts.length; i++) {
-      pathes.push(this.getPath(verts[i]));
-    }
-    return pathes;
-  }
-}
+  _getResidues(backbone) {
+    const vertices = this._complex._atoms;
+    const bbverts = new Array(vertices.length).fill(false);
 
-export default class ResiudeSeq {
-  constructor() {
-    this._complex = null;
-    this._backbone = [];
-  }
-
-  defineResidues(complex) {
-    this._complex = complex;
-
-    this._findBackbone();
-  }
-
-  _findBackbone() {
-    const graph = new GraphUtils(this._complex._bonds, this._complex._atoms);
-
-    const first = graph.DFS(this._complex._atoms[0]);
-    const second = graph.DFS(first);
-    const path = graph.getPath(first);
-
-    /*
-    const first = graph.BFS(this._complex._atoms[0]);
-    const second = graph.BFS(first);
-
-    const path = graph.BFS(first, second);
-*/
-
-    for (let i = 0; i < path.length; i++) {
-      path[i]._occupancy = 0;
+    for (let i = 0; i < backbone.length; i++) {
+      bbverts[backbone[i]._index] = true;
     }
 
-    return 1;
+    function getLongest(array) {
+      let longest = '';
+      for (let i = 0; i < array.length; i++) {
+        if (array[i].replace(/[{()}]/g, '').length > longest.replace(/[{()}]/g, '').length) {
+          longest = array[i];
+        }
+      }
+      array.splice(array.indexOf(longest), 1);
+      return longest;
+    }
+
+    function dfs(atom, visited, atoms, prevAtom = null) {
+      const bondSymbols = ['', '=', '#', '$'];
+      atoms.push(atom);
+      visited[atom._index] = true;
+      const bonds = atom._bonds;
+      const strings = [];
+      let numb = 0;
+      for (let i = 0; i < atom._bonds.length; i++) {
+        const nextAtom = (bonds[i]._left._index === atom._index) ? bonds[i]._right : bonds[i]._left;
+        const bond = bondSymbols[bonds[i]._order - 1];
+        if (!visited[nextAtom._index]) {
+          strings.push(bond + dfs.call(this, nextAtom, visited, atoms, atom));
+        } else if (nextAtom !== prevAtom && atoms.includes(nextAtom) && !this._cycleBonds.includes(bonds[i])) {
+          this._cycle = true;
+          this._cAtoms.push(nextAtom);
+          this._cycleBonds.push(bonds[i]);
+          this._cycles[nextAtom._index] = ++this._cycleIndx;
+          numb = 10 * numb + this._cycleIndx;
+        }
+      }
+
+      if (this._cAtoms.includes(atom)) {
+        numb = 10 * numb + this._cycles[atom._index];
+        this._cAtoms.splice(this._cAtoms.indexOf(atom), 1);
+        this._cycle = !(this._cAtoms.length === 0);
+      }
+
+      let atomName = atom.element.name === 'H' ? '' : atom.element.name;
+      atomName = numb ? atomName + numb : atomName;
+      const longest = getLongest(strings);
+      strings.forEach((element, index, array) => {
+        if (element !== '') {
+          array[index] = `(${element})`;
+        }
+      });
+      const result = atomName + strings.join('') + longest;
+      return result;
+    }
+
+    function callDfs(start, verts, set) {
+      this._cycleIndx = 0;
+      this._cycle = false;
+      this._cAtoms = [];
+      this._cycles = {};
+      this._cycleBonds = [];
+      verts[start._index] = false;
+      const smarts = dfs.call(this, start, verts, set);
+      verts[start._index] = true;
+      return smarts;
+    }
+
+    const result = [];
+
+    for (let j = 0; j < backbone.length; j += 3) {
+      const alphaC = backbone[j + 1];
+      const atomsSet = [];
+      bbverts[backbone[j]._index] = false;
+      bbverts[backbone[j + 2]._index] = false;
+      const smarts = callDfs.call(this, alphaC, bbverts, atomsSet);
+      bbverts[backbone[j]._index] = true;
+      bbverts[backbone[j + 2]._index] = true;
+      result.push({atoms: atomsSet, SMARTS: smarts});
+    }
+
+    return result;
   }
 
-  _finalizeBackbone() {
-
+  _setOccupancy(occ, res) {
+    for (let i = 0; i < res.atoms.length; i++) {
+      res.atoms[i]._occupancy = occ;
+    }
   }
 
-  _nameResidues() {
+  _readSamplesFromFile() {
+  }
 
+  _nameResidues(residues) {
+    let max = 0;
+    let resIndx = -1;
+    const samples = this._readSamplesFromFile();
+    for (let i = 0; i < residues.length; i++) {
+      //if (this._compareWithSamples(samples, residues[i]) > max) {
+      //  resIndx = i;
+      //}
+    }
+    //find max
+    //return name
+    let occ = 0;
+    for (let i = 0; i < residues.length; i++) {
+      this._setOccupancy(occ, residues[i]);
+      occ = !occ;
+    }
+  }
+
+  _addResidues() {
   }
 }
