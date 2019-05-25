@@ -1,5 +1,6 @@
 import GraphUtils from '../utils/GraphUtils';
 import FSMachine from '../utils/FSMachine';
+import SMILESGenerator from '../utils/SMILESGenerator';
 import chem from '../chem';
 
 const {
@@ -9,10 +10,6 @@ const {
   Molecule,
   Atom,
 } = chem;
-
-class residue {
-
-}
 
 export default class ResiudeSeq {
   constructor(complex) {
@@ -27,9 +24,15 @@ export default class ResiudeSeq {
     const bbone = this._finalizeBackbone(path);
     const residues = this._getResidues(bbone);
 
+    const SM = new SMILESGenerator();
+    const residuesSMILES = [];
+    for (let i = 0; i < residues.length; i++) {
+      residuesSMILES.push({ SMILES: SM.generateCanonicalSMILES(residues[i]), atomsSet: residues[i] });
+    }
 
-    this._nameResidues(residues);
-    this._addResidues(residues);
+    const namedResidues = this._nameResidues(residuesSMILES);
+    this._addResidues(namedResidues);
+    return residuesSMILES;
   }
 
   _tryToFindBackbone(startNode, graph) {
@@ -49,11 +52,7 @@ export default class ResiudeSeq {
     FSM.eatPath(path);
     const bbone = FSM.getResult();
 
-    if (path.length !== bbone.length) {
-      return false;
-    }
-
-    return true;
+    return path.length === bbone.length;
   }
 
   _findBackbone() {
@@ -95,87 +94,54 @@ export default class ResiudeSeq {
       bbverts[backbone[i]._index] = true;
     }
 
-    function getLongest(array) {
-      let longest = '';
-      for (let i = 0; i < array.length; i++) {
-        if (array[i].replace(/[{()}]/g, '').length > longest.replace(/[{()}]/g, '').length) {
-          longest = array[i];
-        }
-      }
-      array.splice(array.indexOf(longest), 1);
-      return longest;
-    }
-
-    function dfs(atom, visited, atoms, prevAtom = null) {
-      const bondSymbols = ['', '=', '#', '$'];
-      atoms.push(atom);
+    function dfs(atom, visited, nodes) {
+      const node = {}; // node is {_atom: a, adj: [], rank: int, indx: int, cycleIndx: int}
+      node._atom = atom;
+      node._adj = [];
+      node.rank = 0;
+      node.cycleIndx = [];
       visited[atom._index] = true;
+      nodes.push(node);
       const bonds = atom._bonds;
-      const strings = [];
-      let numb = 0;
       for (let i = 0; i < atom._bonds.length; i++) {
         const nextAtom = (bonds[i]._left._index === atom._index) ? bonds[i]._right : bonds[i]._left;
-        const bond = bondSymbols[bonds[i]._order - 1];
-        if (!visited[nextAtom._index]) {
-          strings.push(bond + dfs.call(this, nextAtom, visited, atoms, atom));
-        } else if (nextAtom !== prevAtom && atoms.includes(nextAtom) && !this._cycleBonds.includes(bonds[i])) {
-          this._cycle = true;
-          this._cAtoms.push(nextAtom);
-          this._cycleBonds.push(bonds[i]);
-          this._cycles[nextAtom._index] = ++this._cycleIndx;
-          numb = 10 * numb + this._cycleIndx;
+        if (nextAtom.element.name !== 'H') {
+          if (!visited[nextAtom._index]) {
+            node._adj.push({ node: dfs.call(this, nextAtom, visited, nodes), bondType: bonds[i]._order });
+          } else {
+            const N = nodes.find(element => element._atom._index === nextAtom._index);
+            if (N) {
+              node._adj.push({ node: N, bondType: bonds[i]._order });// adjacent is {node: _node, bontType: int}
+            }
+          }
         }
       }
 
-      if (this._cAtoms.includes(atom)) {
-        numb = 10 * numb + this._cycles[atom._index];
-        this._cAtoms.splice(this._cAtoms.indexOf(atom), 1);
-        this._cycle = !(this._cAtoms.length === 0);
-      }
-
-      let atomName = atom.element.name === 'H' ? '' : atom.element.name;
-      atomName = numb ? atomName + numb : atomName;
-      const longest = getLongest(strings);
-      strings.forEach((element, index, array) => {
-        if (element !== '') {
-          array[index] = `(${element})`;
-        }
-      });
-      const result = atomName + strings.join('') + longest;
-      return result;
+      return node;
     }
 
     function callDfs(start, verts, set) {
-      this._cycleIndx = 0;
-      this._cycle = false;
-      this._cAtoms = [];
-      this._cycles = {};
-      this._cycleBonds = [];
       verts[start._index] = false;
-      const smarts = dfs.call(this, start, verts, set);
+      dfs.call(this, start, verts, set);
       verts[start._index] = true;
-      return smarts;
+      set.forEach((element, indx) => { element.indx = indx; });
     }
 
     const result = [];
 
     for (let j = 0; j < backbone.length; j += 3) {
       const alphaC = backbone[j + 1];
-      const atomsSet = [];
-      bbverts[backbone[j]._index] = false;
-      bbverts[backbone[j + 2]._index] = false;
-      const smarts = callDfs.call(this, alphaC, bbverts, atomsSet);
-      bbverts[backbone[j]._index] = true;
-      bbverts[backbone[j + 2]._index] = true;
-      result.push({atoms: atomsSet, SMARTS: smarts});
+      const residueGraph = [];
+      callDfs.call(this, alphaC, bbverts, residueGraph);
+      result.push(residueGraph);
     }
 
     return result;
   }
 
   _setOccupancy(occ, res) {
-    for (let i = 0; i < res.atoms.length; i++) {
-      res.atoms[i]._occupancy = occ;
+    for (let i = 0; i < res.length; i++) {
+      res[i]._atom._occupancy = occ;
     }
   }
 
@@ -195,7 +161,7 @@ export default class ResiudeSeq {
     //return name
     let occ = 0;
     for (let i = 0; i < residues.length; i++) {
-      this._setOccupancy(occ, residues[i]);
+      this._setOccupancy(occ, residues[i].atomsSet);
       occ = !occ;
     }
   }
