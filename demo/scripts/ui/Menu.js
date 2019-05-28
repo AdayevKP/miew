@@ -2152,6 +2152,10 @@ Menu.prototype._initToolsPanel = function () {
     const type = this.getAttribute('data-value');
     let visual;
     switch (type) {
+      case 'resplit':
+        self._viewer.resplit();
+        self._onMenuOff();
+        break;
       case 'dssp':
         self._viewer.dssp();
         self._onMenuOff();

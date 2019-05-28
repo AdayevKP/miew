@@ -40,6 +40,7 @@ import logger from './utils/logger';
 import Cookies from './utils/Cookies';
 import capabilities from './gfx/capabilities';
 import WebVRPoC from './gfx/vr/WebVRPoC';
+import ResiudeSeq from './chem/ResidueSeq';
 
 const {
   selectors,
@@ -3863,6 +3864,16 @@ Miew.prototype.dssp = function (complexName) {
       rep.needsRebuild = true;
     }
   });
+};
+
+Miew.prototype.resplit = function (complexName) {
+  const visual = this._getComplexVisual(complexName);
+  if (!visual) {
+    return;
+  }
+  const complex = visual.getComplex();
+  const RS = new ResiudeSeq();
+  RS.defineResidues(complex);
 };
 
 Miew.prototype.exportCML = function () {
