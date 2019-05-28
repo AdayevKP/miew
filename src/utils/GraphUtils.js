@@ -1,25 +1,12 @@
 import FSMachine from './FSMachine';
-import chem from "../chem";
-const {
-  Complex,
-  Element,
-  Bond,
-  Molecule,
-  Atom
-} = chem;
 
 export default class GraphUtils {
-  constructor(edges, vertices) {
-    this._edges = edges;
+  constructor(vertices) {
     this._vertices = vertices;
-    this._endNode = null;
     this._distances = [];
-    this._vertsQueue = [];
     this._parents = [];
     this._startNode = null;
-
-    this._bbone = null;
-
+    this._automat = null;
     this._visited = [];
   }
 
@@ -38,7 +25,7 @@ export default class GraphUtils {
         const autClone = automat.clone();
         if (!this._visited[nextNode._index] && autClone.eatNode(nextNode)) {
           this._distances[nextNode._index] = this._distances[Node._index] + 1;
-          this._parents[nextNode._index] = {node: nextNode, parent: Node._index};
+          this._parents[nextNode._index] = { node: nextNode, parent: Node._index };
           doDfs.call(this, nextNode, autClone);
         }
       }
@@ -60,26 +47,24 @@ export default class GraphUtils {
 
     const path = [];
     path.push(curNode);
-    let parent;
-    parent = this._parents[curNode._index].parent;
+    let parent = this._parents[curNode._index];
 
-    while (parent !== curNode._index) {
-      curNode = this._parents[parent].node;
+    while (parent.parent !== curNode._index) {
+      curNode = this._parents[parent.parent].node;
       path.push(curNode);
-      parent = this._parents[curNode._index].parent;
+      parent = this._parents[curNode._index];
     }
 
-    path.push(this._parents[parent].node);
+    path.push(this._parents[parent.parent].node);
 
     return path;
   }
 
-  getAllPathes() {
-    const pathes = [];
-    const verts = this._vertices;
-    for (let i = 0; i < verts.length; i++) {
-      pathes.push(this.getPath(verts[i]));
+  getAutomatPath() {
+    if (this._automat) {
+      return this._automat.getResult();
     }
-    return pathes;
+
+    return [];
   }
 }

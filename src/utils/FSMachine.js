@@ -5,7 +5,6 @@ export default class FSMachine {
     this._curState = 'INITIAL';
     this._resultWord = [];
     this._currentSubWord = [];
-    //hardcode FIX IT
     this._havePatern = false;
 
     this._states = {
@@ -21,7 +20,18 @@ export default class FSMachine {
   }
 
   clone() {
-    return Object.assign(Object.create(this), this);
+    const clone = new FSMachine();
+    for (let i = 0; i < this._currentSubWord.length; i++) {
+      clone._currentSubWord[i] = this._currentSubWord[i];
+    }
+
+    for (let i = 0; i < this._resultWord.length; i++) {
+      clone._resultWord[i] = this._resultWord[i];
+    }
+
+    clone._havePatern = this._havePatern;
+    clone._curState = this._curState;
+    return clone;
   }
 
   _changeState(state, Node, drop = false) {
@@ -35,16 +45,15 @@ export default class FSMachine {
     }
   }
 
-  _ENDstate(Node) {
+  _ENDstate() {
     this._pushBackResult();
     return false;
   }
 
   _initialState(Node) {
-    const name = Node.element.name;
     const bonds = Node._bonds.length;
-    if (name === 'N' || (name === 'C' && bonds === 3)) {
-      this._changeState(name, Node);
+    if (Node.element.name === 'N' || (Node.element.name === 'C' && bonds === 3)) {
+      this._changeState(Node.element.name, Node);
     }
     return true;
   }
@@ -57,6 +66,8 @@ export default class FSMachine {
     if (this._resultWord.length >= 3) {
       this._havePatern = true;
     }
+
+    this._currentSubWord = [];
   }
 
   _dropState() {
@@ -65,6 +76,7 @@ export default class FSMachine {
     if (this._havePatern) {
       newState = 'END';
       res = false;
+      this._pushBackResult();
     } else {
       newState = 'INITIAL';
       res = true;
@@ -74,11 +86,10 @@ export default class FSMachine {
   }
 
   _Nstate(Node) {
-    const name = Node.element.name;
     const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 4) {
+    if (Node.element.name === 'C' && bonds === 4) {
       this._changeState('NC', Node);
-    } else if (name === 'C' && bonds === 3) {
+    } else if (Node.element.name === 'C' && bonds === 3) {
       this._changeState('C', Node, true);
     } else {
       return this._dropState();
@@ -87,10 +98,10 @@ export default class FSMachine {
   }
 
   _NCstate(Node) {
-    const name = Node.element.name;
     const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 3) {
+    if (Node.element.name === 'C' && bonds === 3) {
       this._changeState('NCC', Node);
+      this._pushBackResult();
     } else {
       return this._dropState();
     }
@@ -98,9 +109,7 @@ export default class FSMachine {
   }
 
   _NCCstate(Node) {
-    const name = Node.element.name;
-    this._pushBackResult();
-    if (name === 'N') {
+    if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
     } else {
       return this._dropState();
@@ -109,11 +118,10 @@ export default class FSMachine {
   }
 
   _Cstate(Node) {
-    const name = Node.element.name;
     const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 4) {
+    if (Node.element.name === 'C' && bonds === 4) {
       this._changeState('CC', Node);
-    } else if (name === 'N') {
+    } else if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
     } else {
       return this._dropState();
@@ -122,9 +130,9 @@ export default class FSMachine {
   }
 
   _CCstate(Node) {
-    const name = Node.element.name;
-    if (name === 'N') {
+    if (Node.element.name === 'N') {
       this._changeState('CCN', Node);
+      this._pushBackResult();
     } else {
       return this._dropState();
     }
@@ -133,9 +141,8 @@ export default class FSMachine {
 
   _CCNstate(Node) {
     this._pushBackResult();
-    const name = Node.element.name;
     const bonds = Node._bonds.length;
-    if (name === 'C' && bonds === 3) {
+    if (Node.element.name === 'C' && bonds === 3) {
       this._changeState('C', Node, true);
     } else {
       return this._dropState();
@@ -159,7 +166,10 @@ export default class FSMachine {
   }
 
   getResult() {
-    this._pushBackResult();
+    const intersec = _.intersectionWith(this._resultWord, this._currentSubWord, (a, b) => a._index === b._index);
+    if (_.isEmpty(intersec)) {
+      this._pushBackResult();
+    }
     return this._resultWord;
   }
 }

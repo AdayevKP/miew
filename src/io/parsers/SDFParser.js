@@ -5,8 +5,6 @@ import chem from '../../chem';
 import SDFStream from './SDFStream';
 import Assembly from '../../chem/Assembly';
 
-import ResiudeSeq from '../../chem/ResidueSeq';
-
 const {
   Complex,
   Element,
@@ -41,7 +39,7 @@ const possibleTitleTags = ['msg', 'MSG', 'message', 'title', 'description', 'des
 const tagsNames = ['name', 'id', 'title'];
 const tags = { name: possibleNameTags, id: possibleIDTags, title: possibleTitleTags };
 
-function buildChainID(index) {
+export function buildChainID(index) {
   if (!index) {
     return 'A';
   }
@@ -337,8 +335,6 @@ export default class SDFParser extends Parser {
 
     this._finalize();
 
-    const RS = new ResiudeSeq(result);
-    RS.defineResidues();
     return result;
   }
 }

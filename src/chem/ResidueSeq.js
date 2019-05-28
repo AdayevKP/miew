@@ -1,38 +1,103 @@
+import _ from 'lodash';
 import GraphUtils from '../utils/GraphUtils';
 import FSMachine from '../utils/FSMachine';
 import SMILESGenerator from '../utils/SMILESGenerator';
-import chem from '../chem';
+import { buildChainID } from '../io/parsers/SDFParser';
 
-const {
-  Complex,
-  Element,
-  Bond,
-  Molecule,
-  Atom,
-} = chem;
+const residuesDict = {
+  'CCCCN=C(N)N': 'ARG',
+  'CCC(N)=O': 'ASN',
+  'CCC(=O)O': 'ASP',
+  CCS: 'CYS',
+  'CCCC(=O)O': 'GLY',
+  'CCCC(N)=O': 'GLN',
+  C: 'GLY',
+  'CCC1=CN=CN1': 'HIS',
+  'CC(C)CC': 'ILE',
+  'CCC(C)C': 'LEU',
+  CCCCCN: 'LYS',
+  CCCSC: 'MET',
+  'CCC1=CC=CC=C1': 'PHE',
+  CCCC: 'PRO',
+  CCSE: 'SEC',
+  CCO: 'SER',
+  'CC(C)O': 'THR',
+  'CCC1=CNC2=CC=CC=C12': 'TRP',
+  'CCC1=CC=C(O)C=C1': 'TYR',
+  'CC(C)C': 'VAL',
+};
 
 export default class ResiudeSeq {
-  constructor(complex) {
-    this._complex = complex;
-    this._backbone = [];
-    this._graph = new GraphUtils(this._complex._bonds, this._complex._atoms);
-    this._residues = null;
+  constructor() {
+    this._complex = null;
+    this._graph = null;
+    this.__compoundIndx = 0;
   }
 
-  defineResidues() {
-    const path = this._findBackbone();
-    const bbone = this._finalizeBackbone(path);
-    const residues = this._getResidues(bbone);
-
-    const SM = new SMILESGenerator();
-    const residuesSMILES = [];
-    for (let i = 0; i < residues.length; i++) {
-      residuesSMILES.push({ SMILES: SM.generateCanonicalSMILES(residues[i]), atomsSet: residues[i] });
+  _bfs(startNode, visited = null) {
+    if (!startNode) {
+      return null;
+    }
+    const vertices = this._complex._atoms;
+    if (!visited) {
+      visited = Array(vertices.length).fill(false);
     }
 
-    const namedResidues = this._nameResidues(residuesSMILES);
-    this._addResidues(namedResidues);
-    return residuesSMILES;
+    const vertsQueue = [];
+    const distances = new Array(vertices.length).fill(-1);
+    distances[startNode._index] = 0;
+    vertsQueue.push(startNode);
+    while (!_.isEmpty(vertsQueue)) {
+      const curNode = vertsQueue.shift();
+      visited[curNode._index] = true;
+      const bonds = curNode._bonds;
+      for (let i = 0; i < curNode._bonds.length; i++) {
+        const nextNode = (bonds[i]._left._index === curNode._index) ? bonds[i]._right : bonds[i]._left;
+        if (!visited[nextNode._index]) {
+          vertsQueue.push(nextNode);
+          distances[nextNode._index] = distances[curNode._index] + 1;
+        }
+      }
+    }
+
+    const maxIndx = distances.indexOf(Math.max(...distances));
+    return vertices.find(V => V._index === maxIndx);
+  }
+
+  _findConnectedComponents() {
+    const atoms = this._complex._atoms;
+    const visited = Array(atoms.length).fill(false);
+    let startAtom = atoms[0];
+    const result = [];
+    while (startAtom) {
+      result.push(startAtom);
+      this._bfs(startAtom, visited);
+      startAtom = atoms[visited.indexOf(false)];
+    }
+
+    return result;
+  }
+
+  defineResidues(complex) {
+    this._complex = complex;
+    this._graph = new GraphUtils(this._complex._atoms);
+
+    const CC = this._findConnectedComponents();
+
+    for (let i = 0; i < CC.length; i++) {
+      this.__compoundIndx++;
+      const bbone = this._findBackbone(CC[i]);
+      if (bbone) {
+        const residues = this._getResidues(bbone);
+        this._nameResidues(residues);
+        this._addResidues(residues);
+      }
+    }
+
+    this._complex = null;
+    this._graph = null;
+
+    return true;
   }
 
   _tryToFindBackbone(startNode, graph) {
@@ -55,35 +120,28 @@ export default class ResiudeSeq {
     return path.length === bbone.length;
   }
 
-  _findBackbone() {
-    const graph = this._graph;
-    const atoms = this._complex._atoms;
-    return this._tryToFindBackbone(atoms[0], graph);
-  }
-
-  _finalizeBackbone(path) {
-    let i = 0;
-    const atoms = this._complex._atoms;
-    const graph = this._graph;
-    while (!this._isBackbone(path) && i < atoms.length) {
-      const pathes = graph.getAllPathes();
-      const backbones = [];
-      for (let j = 0; j < pathes.length; j++) {
-        const FSM = new FSMachine();
-        FSM.eatPath(pathes[j]);
-        backbones.push(FSM.getResult());
-      }
-
-      const lengths = backbones.map(a => a.length);
-      const indx = lengths.indexOf(Math.max(...lengths));
-      path = backbones[indx];
-      i++;
-      this._tryToFindBackbone(atoms[i], graph);
+  _backbondIterativeSearch(startAtom, graph) {
+    let newStartAtom = startAtom;
+    const visitedVerts = [];
+    let path = graph.getAutomatPath();
+    while (!this._isBackbone(path) && !visitedVerts.includes(newStartAtom)) {
+      visitedVerts.push(newStartAtom);
+      newStartAtom = this._bfs(newStartAtom);
+      this._tryToFindBackbone(newStartAtom, graph);
+      path = graph.getAutomatPath();
     }
 
-    const res = this._isBackbone(path);
-
     return path;
+  }
+
+  _findBackbone(startAtom) {
+    const graph = this._graph;
+    let path = this._tryToFindBackbone(startAtom, graph);
+
+    if (!this._isBackbone(path)) {
+      path = this._backbondIterativeSearch(startAtom, graph);
+    }
+    return this._isBackbone(path) ? path : [];
   }
 
   _getResidues(backbone) {
@@ -100,6 +158,7 @@ export default class ResiudeSeq {
       node._adj = [];
       node.rank = 0;
       node.cycleIndx = [];
+      node.alphaC = false;
       visited[atom._index] = true;
       nodes.push(node);
       const bonds = atom._bonds;
@@ -133,39 +192,46 @@ export default class ResiudeSeq {
       const alphaC = backbone[j + 1];
       const residueGraph = [];
       callDfs.call(this, alphaC, bbverts, residueGraph);
-      result.push(residueGraph);
+
+      const SM = new SMILESGenerator();
+      residueGraph[0].alphaC = true;
+      const smiles = SM.generateCanonicalSMILES(residueGraph);
+
+      callDfs.call(this, backbone[j], bbverts, residueGraph);
+      callDfs.call(this, backbone[j + 2], bbverts, residueGraph);
+      result.push({ SMILES: smiles, atomsSet: residueGraph });
     }
 
     return result;
   }
 
-  _setOccupancy(occ, res) {
-    for (let i = 0; i < res.length; i++) {
-      res[i]._atom._occupancy = occ;
-    }
-  }
-
-  _readSamplesFromFile() {
-  }
-
   _nameResidues(residues) {
-    let max = 0;
-    let resIndx = -1;
-    const samples = this._readSamplesFromFile();
     for (let i = 0; i < residues.length; i++) {
-      //if (this._compareWithSamples(samples, residues[i]) > max) {
-      //  resIndx = i;
-      //}
-    }
-    //find max
-    //return name
-    let occ = 0;
-    for (let i = 0; i < residues.length; i++) {
-      this._setOccupancy(occ, residues[i].atomsSet);
-      occ = !occ;
+      residues[i].name = _.isUndefined(residuesDict[residues[i].SMILES]) ? 'UNK' : residuesDict[residues[i].SMILES];
     }
   }
 
-  _addResidues() {
+  _setResiduesForAtoms(nodes, residue) {
+    nodes.forEach((node) => {
+      const atom = node._atom;
+      const oldRes = atom._residue;
+      oldRes._atoms.splice(oldRes._atoms.indexOf(atom), 1);
+      atom._residue = residue;
+    });
+  }
+
+  _addResidues(namedResidues) {
+    const complex = this._complex;
+    const chainID = buildChainID(this.__compoundIndx);
+    const chain = complex.getChain(chainID) || complex.addChain(chainID);
+    for (let i = 0; i < namedResidues.length; i++) {
+      const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
+      this._setResiduesForAtoms(namedResidues[i].atomsSet, residue);
+      namedResidues[i].atomsSet.forEach(node => residue._atoms.push(node._atom));
+    }
+
+    complex.finalize({
+      needAutoBonding: false, detectAromaticLoops: false, enableEditing: true,
+    });
   }
 }

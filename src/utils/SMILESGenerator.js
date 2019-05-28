@@ -38,9 +38,8 @@ export default class SMILESGenerator {
     const dict = {};
 
     for (let i = 0; i < graph.length; i++) {
-      const number = graph[i]._atom.element.number;
+      const { number } = graph[i]._atom.element;
       const bondsNumb = graph[i]._adj.length;
-      let bondType = 0;
       const key = number * 100 + bondsNumb;
       if (!dict[key]) {
         dict[key] = 0;
@@ -61,35 +60,34 @@ export default class SMILESGenerator {
 
   _tieBreaking(classes) {
     function findCommonNode(nodes) {
-      const adjacents = [];
-      nodes.forEach((element) => { adjacents.push(element._adj); });
-      const result = _.intersectionWith(...adjacents, (a, b) => a.node.indx === b.node.indx);
+      const adjacent = [];
+      nodes.forEach((element) => { adjacent.push(element._adj); });
+      const result = _.intersectionWith(...adjacent, (a, b) => a.node.indx === b.node.indx);
       return result.length === 0 ? null : result[0].node;
     }
 
     let offset = 1;
-    const newclasses = {};
+    const newClasses = {};
     for (let i = 1; i <= classes.length; i++) {
       if (classes[i].length > 1) {
         const cn = findCommonNode(classes[i]);
         if (cn) {
-          const sorted = _.sortBy(classes[i], (element) => {
+          classes[i] = _.sortBy(classes[i], (element) => {
             const common = element._adj.find(adj => adj.node.indx === cn.indx);
             return -common.bondType;
           });
-          classes[i] = sorted;
         }
         for (let j = 0; j < classes[i].length; j++) {
-          newclasses[offset++] = [classes[i][j]];
+          newClasses[offset++] = [classes[i][j]];
         }
       } else {
-        newclasses[offset++] = classes[i];
+        newClasses[offset++] = classes[i];
       }
     }
-    newclasses.length = Object.keys(newclasses).length;
+    newClasses.length = Object.keys(newClasses).length;
 
-    this._fixClasses(newclasses);
-    return newclasses;
+    this._fixClasses(newClasses);
+    return newClasses;
   }
 
   _createCanonicalRanking(graph) {
@@ -102,9 +100,6 @@ export default class SMILESGenerator {
 
     if (classes.length < graph.length) {
       classes = this._tieBreaking(classes);
-    }
-    if (classes.length !== graph.length) {
-      alert('ty loh');
     }
     return classes;
   }
@@ -183,12 +178,6 @@ export default class SMILESGenerator {
             indxString += _.intersection(node.cycleIndx, nextNode.cycleIndx).join('');
           }
         }
-        /*else if (nextNode !== prevNode && (nextNode.cycleIndx !== node.cycleIndx || nextNode.cycleIndx === '')
-        && prevNode !== null) {
-          this.cycleIndx++;
-          nextNode.cycleIndx += this.cycleIndx.toString();
-          node.cycleIndx += this.cycleIndx.toString();
-        }*/
       }
 
       if (indxString !== '') {
@@ -208,25 +197,14 @@ export default class SMILESGenerator {
       return result;
     }
 
-    function findMinRank(arr) {
-      let min = arr[0];
-      for (let i = 0; i < arr.length; i++) {
-        if (arr[i].rank < min.rank) {
-          min = arr[i];
-        }
-      }
-
-      return min;
-    }
-
     const visited = new Array(graph.length).fill(false);
     this.cycleIndx = 0;
-    const minRank = findMinRank(graph);
-    return dfs.call(this, minRank, visited);
+    const start = _.find(graph, ['alphaC', true]);
+    return dfs.call(this, start, visited);
   }
 
   generateCanonicalSMILES(graph) {
-    const classes = this._createCanonicalRanking(graph);
+    this._createCanonicalRanking(graph);
     return this.generateSMILES(graph);
   }
 }
