@@ -3874,6 +3874,12 @@ Miew.prototype.resplit = function (complexName) {
   const complex = visual.getComplex();
   const RS = new ResiudeSeq();
   RS.defineResidues(complex);
+
+  visual._reprList.forEach((rep) => {
+    if (rep.colorer.id === 'RT') {
+      rep.needsRebuild = true;
+    }
+  });
 };
 
 Miew.prototype.exportCML = function () {
