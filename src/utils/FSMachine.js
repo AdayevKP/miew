@@ -87,7 +87,7 @@ export default class FSMachine {
 
   _Nstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds === 4) {
+    if (Node.element.name === 'C') {
       this._changeState('NC', Node);
     } else if (Node.element.name === 'C' && bonds === 3) {
       this._changeState('C', Node, true);
@@ -102,6 +102,9 @@ export default class FSMachine {
     if (Node.element.name === 'C' && bonds === 3) {
       this._changeState('NCC', Node);
       this._pushBackResult();
+    } else if (Node.element.name === 'C') {
+      this._currentSubWord.shift();
+      this._changeState('CC', Node, false);
     } else {
       return this._dropState();
     }
@@ -109,8 +112,15 @@ export default class FSMachine {
   }
 
   _NCCstate(Node) {
+    const bonds = Node._bonds.length;
     if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
+    } else if (Node.element.name === 'C' && bonds === 3) {
+      this._changeState('C', Node, true);
+    } else if (Node.element.name === 'C') {
+      this._currentSubWord.shift();
+      this._currentSubWord.shift();
+      this._changeState('CC', Node, false);
     } else {
       return this._dropState();
     }
@@ -119,10 +129,12 @@ export default class FSMachine {
 
   _Cstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds === 4) {
+    if (Node.element.name === 'C') {
       this._changeState('CC', Node);
     } else if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
+    } else if (Node.element.name === 'C', bonds.length === 3) {
+      this._changeState('C', Node, true);
     } else {
       return this._dropState();
     }
@@ -130,9 +142,12 @@ export default class FSMachine {
   }
 
   _CCstate(Node) {
+    const bonds = Node._bonds.length;
     if (Node.element.name === 'N') {
       this._changeState('CCN', Node);
       this._pushBackResult();
+    } else if (Node.element.name === 'C' && bonds.length === 3) {
+      this._changeState('C', Node, true);
     } else {
       return this._dropState();
     }
@@ -144,6 +159,10 @@ export default class FSMachine {
     const bonds = Node._bonds.length;
     if (Node.element.name === 'C' && bonds === 3) {
       this._changeState('C', Node, true);
+    } else if (Node.element.name === 'C') {
+      this._currentSubWord.shift();
+      this._currentSubWord.shift();
+      this._changeState('NC', Node, false);
     } else {
       return this._dropState();
     }
