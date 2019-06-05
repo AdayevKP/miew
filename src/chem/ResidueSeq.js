@@ -25,6 +25,7 @@ const residuesDict = {
   'CCC1=CNC2=CC=CC=C12': 'TRP',
   'CCC1=CC=C(O)C=C1': 'TYR',
   'CC(C)C': 'VAL',
+  CC: 'ALA',
 };
 
 export default class ResiudeSeq {
