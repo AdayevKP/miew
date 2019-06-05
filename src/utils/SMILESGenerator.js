@@ -162,7 +162,8 @@ export default class SMILESGenerator {
       let numb = 0;
       for (let i = 0; i < adjacent.length; i++) {
         const nextNode = adjacent[i].node; // adjacent is {node: _node, bontType: int}
-        const bond = bondSymbols[adjacent[i].bondType - 1];
+        //const bond = bondSymbols[adjacent[i].bondType - 1] ? bondSymbols[adjacent[i].bondType - 1] : '';
+        const bond = '';
         if (!visited[nextNode.indx]) {
           strings.push(bond + dfs.call(this, nextNode, visited, node));
         } else if (nextNode !== prevNode && prevNode !== null) {

@@ -4,7 +4,7 @@ import FSMachine from '../utils/FSMachine';
 import SMILESGenerator from '../utils/SMILESGenerator';
 import { buildChainID } from '../io/parsers/SDFParser';
 
-const residuesDict = {
+/*const residuesDict = {
   'CCCCN=C(N)N': 'ARG',
   'CCC(N)=O': 'ASN',
   'CCC(=O)O': 'ASP',
@@ -24,6 +24,30 @@ const residuesDict = {
   'CC(C)O': 'THR',
   'CCC1=CNC2=CC=CC=C12': 'TRP',
   'CCC1=CC=C(O)C=C1': 'TYR',
+  'CC(C)C': 'VAL',
+  CC: 'ALA',
+}; */
+
+const residuesDict = {
+  'CCCCNC(N)N': 'ARG',
+  'CCC(N)O': 'ASN',
+  'CCC(O)O': 'ASP',
+  CCS: 'CYS',
+  'CCCC(O)O': 'GLY',
+  'CCCC(N)O': 'GLN',
+  C: 'GLY',
+  CCC1CNCN1: 'HIS',
+  'CC(C)CC': 'ILE',
+  'CCC(C)C': 'LEU',
+  CCCCCN: 'LYS',
+  CCCSC: 'MET',
+  CCC1CCCCC1: 'PHE',
+  CCCC: 'PRO',
+  CCSE: 'SEC',
+  CCO: 'SER',
+  'CC(C)O': 'THR',
+  CCC1CNC2CCCCC12: 'TRP',
+  'CCC1CCC(O)C=C1': 'TYR',
   'CC(C)C': 'VAL',
   CC: 'ALA',
 };
@@ -105,7 +129,8 @@ export default class ResiudeSeq {
     const FSM = new FSMachine();
     const first = graph.DFS(startNode);
     const second = graph.DFS(first);
-    FSM.eatPath(graph.getPath(second));
+    const path = graph.getPath(second);
+    FSM.eatPath(path);
     return FSM.getResult();
   }
 
@@ -187,6 +212,10 @@ export default class ResiudeSeq {
       set.forEach((element, indx) => { element.indx = indx; });
     }
 
+    function haveOxygen(atom) {
+      return null;
+    }
+
     const result = [];
 
     for (let j = 0; j < backbone.length; j += 3) {
@@ -198,8 +227,22 @@ export default class ResiudeSeq {
       residueGraph[0].alphaC = true;
       const smiles = SM.generateCanonicalSMILES(residueGraph);
 
-      callDfs.call(this, backbone[j], bbverts, residueGraph);
-      callDfs.call(this, backbone[j + 2], bbverts, residueGraph);
+      const node1 = {}; // node is {_atom: a, adj: [], rank: int, indx: int, cycleIndx: int}
+      node1._atom = backbone[j];
+      node1._adj = [];
+      node1.rank = 0;
+      node1.cycleIndx = [];
+      node1.alphaC = false;
+
+      const node2 = {}; // node is {_atom: a, adj: [], rank: int, indx: int, cycleIndx: int}
+      node2._atom = backbone[j + 2];
+      node2._adj = [];
+      node2.rank = 0;
+      node2.cycleIndx = [];
+      node2.alphaC = false;
+      residueGraph.push(node1, node2);
+      //callDfs.call(this, backbone[j], bbverts, residueGraph);
+      //callDfs.call(this, backbone[j + 2], bbverts, residueGraph);
       result.push({ SMILES: smiles, atomsSet: residueGraph });
     }
 
@@ -232,7 +275,7 @@ export default class ResiudeSeq {
     }
 
     complex.finalize({
-      needAutoBonding: false, detectAromaticLoops: false, enableEditing: true,
+      needAutoBonding: false, detectAromaticLoops: false, enableEditing: false,
     });
   }
 }
