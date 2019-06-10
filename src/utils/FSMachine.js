@@ -19,6 +19,19 @@ export default class FSMachine {
     };
   }
 
+  _haveOxy(Node) {
+    const bonds = Node._bonds;
+    for (let i = 0; i < bonds.length; i++) {
+      const nextAtom = (bonds[i]._left._index === Node._index) ? bonds[i]._right : bonds[i]._left;
+      if (nextAtom.element.name === 'O') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+
   clone() {
     const clone = new FSMachine();
     for (let i = 0; i < this._currentSubWord.length; i++) {
@@ -52,7 +65,7 @@ export default class FSMachine {
 
   _initialState(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'N' || (Node.element.name === 'C' && bonds === 3)) {
+    if (Node.element.name === 'N' || (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node))) {
       this._changeState(Node.element.name, Node);
     }
     return true;
@@ -89,7 +102,7 @@ export default class FSMachine {
     const bonds = Node._bonds.length;
     if (Node.element.name === 'C') {
       this._changeState('NC', Node);
-    } else if (Node.element.name === 'C' && bonds === 3) {
+    } else if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else {
       return this._dropState();
@@ -99,7 +112,7 @@ export default class FSMachine {
 
   _NCstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds === 3) {
+    if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
       this._changeState('NCC', Node);
       this._pushBackResult();
     } else if (Node.element.name === 'C') {
@@ -115,7 +128,7 @@ export default class FSMachine {
     const bonds = Node._bonds.length;
     if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
-    } else if (Node.element.name === 'C' && bonds === 3) {
+    } else if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else if (Node.element.name === 'C') {
       this._currentSubWord.shift();
@@ -129,12 +142,12 @@ export default class FSMachine {
 
   _Cstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C') {
+    if (Node.element.name === 'C' && bonds.length === 3 && this._haveOxy(Node)) {
+      this._changeState('C', Node, true);
+    } if (Node.element.name === 'C') {
       this._changeState('CC', Node);
     } else if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
-    } else if (Node.element.name === 'C', bonds.length === 3) {
-      this._changeState('C', Node, true);
     } else {
       return this._dropState();
     }
@@ -146,7 +159,7 @@ export default class FSMachine {
     if (Node.element.name === 'N') {
       this._changeState('CCN', Node);
       this._pushBackResult();
-    } else if (Node.element.name === 'C' && bonds.length === 3) {
+    } else if (Node.element.name === 'C' && bonds.length === 3 && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else {
       return this._dropState();
@@ -157,7 +170,7 @@ export default class FSMachine {
   _CCNstate(Node) {
     this._pushBackResult();
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds === 3) {
+    if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else if (Node.element.name === 'C') {
       this._currentSubWord.shift();
