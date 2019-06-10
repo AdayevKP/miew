@@ -4,29 +4,15 @@ import FSMachine from '../utils/FSMachine';
 import SMILESGenerator from '../utils/SMILESGenerator';
 import { buildChainID } from '../io/parsers/SDFParser';
 
-/*const residuesDict = {
-  'CCCCN=C(N)N': 'ARG',
-  'CCC(N)=O': 'ASN',
-  'CCC(=O)O': 'ASP',
-  CCS: 'CYS',
-  'CCCC(=O)O': 'GLY',
-  'CCCC(N)=O': 'GLN',
-  C: 'GLY',
-  'CCC1=CN=CN1': 'HIS',
-  'CC(C)CC': 'ILE',
-  'CCC(C)C': 'LEU',
-  CCCCCN: 'LYS',
-  CCCSC: 'MET',
-  'CCC1=CC=CC=C1': 'PHE',
-  CCCC: 'PRO',
-  CCSE: 'SEC',
-  CCO: 'SER',
-  'CC(C)O': 'THR',
-  'CCC1=CNC2=CC=CC=C12': 'TRP',
-  'CCC1=CC=C(O)C=C1': 'TYR',
-  'CC(C)C': 'VAL',
-  CC: 'ALA',
-}; */
+class Node {
+  constructor(atom = null, alphaC = false, rank = 0) {
+    this._atom = atom;
+    this._adj = [];
+    this.rank = rank;
+    this.cycleIndx = [];
+    this.alphaC = alphaC;
+  }
+}
 
 const residuesDict = {
   'CCCCNC(N)N': 'ARG',
@@ -47,7 +33,7 @@ const residuesDict = {
   CCO: 'SER',
   'CC(C)O': 'THR',
   CCC1CNC2CCCCC12: 'TRP',
-  'CCC1CCC(O)C=C1': 'TYR',
+  'CCC1CCC(O)CC1': 'TYR',
   'CC(C)C': 'VAL',
   CC: 'ALA',
 };
@@ -56,7 +42,7 @@ export default class ResiudeSeq {
   constructor() {
     this._complex = null;
     this._graph = null;
-    this.__compoundIndx = 0;
+    this._compoundIndx = 0;
   }
 
   _bfs(startNode, visited = null) {
@@ -110,7 +96,7 @@ export default class ResiudeSeq {
     const CC = this._findConnectedComponents();
 
     for (let i = 0; i < CC.length; i++) {
-      this.__compoundIndx++;
+      this._compoundIndx++;
       const bbone = this._findBackbone(CC[i]);
       if (bbone) {
         const residues = this._getResidues(bbone);
@@ -212,8 +198,14 @@ export default class ResiudeSeq {
       set.forEach((element, indx) => { element.indx = indx; });
     }
 
-    function haveOxygen(atom) {
-      return null;
+    function Oxygen(atom) {
+      const bonds = atom._bonds;
+      for (let i = 0; i < bonds.length; i++) {
+        const nextAtom = (bonds[i]._left._index === atom._index) ? bonds[i]._right : bonds[i]._left;
+        if (nextAtom.element.name === 'O') {
+          return new Node(nextAtom);
+        }
+      }
     }
 
     const result = [];
@@ -227,22 +219,13 @@ export default class ResiudeSeq {
       residueGraph[0].alphaC = true;
       const smiles = SM.generateCanonicalSMILES(residueGraph);
 
-      const node1 = {}; // node is {_atom: a, adj: [], rank: int, indx: int, cycleIndx: int}
-      node1._atom = backbone[j];
-      node1._adj = [];
-      node1.rank = 0;
-      node1.cycleIndx = [];
-      node1.alphaC = false;
-
-      const node2 = {}; // node is {_atom: a, adj: [], rank: int, indx: int, cycleIndx: int}
-      node2._atom = backbone[j + 2];
-      node2._adj = [];
-      node2.rank = 0;
-      node2.cycleIndx = [];
-      node2.alphaC = false;
+      const node1 = new Node(backbone[j]);
+      const node2 = new Node(backbone[j + 2]);
+      const oxygen = Oxygen(backbone[j]) || Oxygen(backbone[j + 2]);
+      if (oxygen) {
+        residueGraph.push(oxygen);
+      }
       residueGraph.push(node1, node2);
-      //callDfs.call(this, backbone[j], bbverts, residueGraph);
-      //callDfs.call(this, backbone[j + 2], bbverts, residueGraph);
       result.push({ SMILES: smiles, atomsSet: residueGraph });
     }
 
@@ -264,9 +247,22 @@ export default class ResiudeSeq {
     });
   }
 
+  _finalize(complex) {
+    const residues = complex._residues;
+    for (let i = 0; i < residues.length; ++i) {
+      residues[i]._finalize();
+    }
+
+    for (let i = 0; i < residues.length; ++i) {
+      residues[i]._index = i;
+    }
+
+    complex._fillComponents(false);
+  }
+
   _addResidues(namedResidues) {
     const complex = this._complex;
-    const chainID = buildChainID(this.__compoundIndx);
+    const chainID = buildChainID(this._compoundIndx);
     const chain = complex.getChain(chainID) || complex.addChain(chainID);
     for (let i = 0; i < namedResidues.length; i++) {
       const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
@@ -274,8 +270,6 @@ export default class ResiudeSeq {
       namedResidues[i].atomsSet.forEach(node => residue._atoms.push(node._atom));
     }
 
-    complex.finalize({
-      needAutoBonding: false, detectAromaticLoops: false, enableEditing: false,
-    });
+    this._finalize(complex);
   }
 }
