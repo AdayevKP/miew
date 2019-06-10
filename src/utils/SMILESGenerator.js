@@ -8,10 +8,17 @@ export default class SMILESGenerator {
     this.cycleIndx = 0;
   }
 
-  _finalizeRanks(dict, graph) {
+  _finalizeRanks(dict, graph, startRank = 0) {
     const keys = Object.keys(dict);
+    let rank = 1;
+    let highRank = 0;
     for (let i = 0; i < keys.length; i++) {
-      dict[keys[i]] = i + 1;
+      if (dict[keys[i]] === 1) {
+        dict[keys[i]] = startRank + rank++;
+      } else {
+        dict[keys[i]] = startRank + keys.length - highRank;
+        highRank++;
+      }
     }
 
     graph.forEach((elem) => { elem.rank = dict[elem.rank]; });
@@ -42,7 +49,9 @@ export default class SMILESGenerator {
       const bondsNumb = graph[i]._adj.length;
       const key = number * 100 + bondsNumb;
       if (!dict[key]) {
-        dict[key] = 0;
+        dict[key] = 1;
+      } else {
+        dict[key]++;
       }
       graph[i].rank = key;
     }
@@ -95,7 +104,7 @@ export default class SMILESGenerator {
     let classes = this._createInitialPartition(graph);
     while (classes.length < graph.length && classes.length > oldClassesLen) {
       oldClassesLen = classes.length;
-      classes = this._refinePartition(graph);
+      classes = this._refinePartition(classes);
     }
 
     if (classes.length < graph.length) {
@@ -104,7 +113,7 @@ export default class SMILESGenerator {
     return classes;
   }
 
-  _refinePartition(graph) {
+  _refinePartition(classes) {
     function primesFun(args) {
       let res = 1;
       for (let i = 0; i < args.length; i++) {
@@ -124,26 +133,46 @@ export default class SMILESGenerator {
       return ranks;
     }
 
-    const dict = {};
+    function reEvaluate(atoms, startRank) {
+      const dict = {};
 
-    const newRanks = new Array(graph.length).fill(0);
+      const newRanks = new Array(atoms.length).fill(0);
 
-    for (let i = 0; i < graph.length; i++) {
-      const ranks = getAdjRanks(graph[i]);
-      const key = primesFun(ranks);
-      if (!dict[key]) {
-        dict[key] = 0;
+      for (let i = 0; i < atoms.length; i++) {
+        const ranks = getAdjRanks(atoms[i]);
+        const key = primesFun(ranks);
+        if (!dict[key]) {
+          dict[key] = 1;
+        } else {
+          dict[key]++;
+        }
+        newRanks[i] = key;
       }
-      newRanks[i] = key;
+
+      for (let i = 0; i < atoms.length; i++) {
+        atoms[i].rank = newRanks[i];
+      }
+
+      this._finalizeRanks(dict, atoms, startRank);
     }
 
-    for (let i = 0; i < graph.length; i++) {
-      graph[i].rank = newRanks[i];
+    let startRank = 0;
+    const result = [];
+    const oldClasses = [];
+
+    for (let i = 1; i <= classes.length; i++) {
+      if (classes[i].length > 1) {
+        startRank = startRank || i - 1;
+        reEvaluate.call(this, classes[i], startRank);
+        oldClasses.push(...classes[i]);
+      } else {
+        oldClasses.push(...classes[i]);
+      }
     }
 
-    this._finalizeRanks(dict, graph);
+    const newClasses = this._buildClasses(oldClasses);
 
-    return this._buildClasses(graph);
+    return newClasses;
   }
 
   generateSMILES(graph) {
@@ -153,7 +182,6 @@ export default class SMILESGenerator {
     }
 
     function dfs(node, visited, prevNode = null) { // node is {_atom: a, adj: [], rank: int, indx: int, cycleIndx: int}
-      const bondSymbols = ['', '=', '#', '$'];
       visited[node.indx] = true;
       const adjacent = node._adj;
       adjacent.sort(compRule);
@@ -162,7 +190,6 @@ export default class SMILESGenerator {
       let numb = 0;
       for (let i = 0; i < adjacent.length; i++) {
         const nextNode = adjacent[i].node; // adjacent is {node: _node, bontType: int}
-        //const bond = bondSymbols[adjacent[i].bondType - 1] ? bondSymbols[adjacent[i].bondType - 1] : '';
         const bond = '';
         if (!visited[nextNode.indx]) {
           strings.push(bond + dfs.call(this, nextNode, visited, node));
