@@ -31,7 +31,6 @@ export default class FSMachine {
     return false;
   }
 
-
   clone() {
     const clone = new FSMachine();
     for (let i = 0; i < this._currentSubWord.length; i++) {
