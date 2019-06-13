@@ -43,6 +43,7 @@ export default class ResiudeSeq {
     this._complex = null;
     this._graph = null;
     this._compoundIndx = 0;
+    this._curChainID = undefined;
   }
 
   _bfs(startNode, visited = null) {
@@ -96,6 +97,7 @@ export default class ResiudeSeq {
     const CC = this._findConnectedComponents();
 
     for (let i = 0; i < CC.length; i++) {
+      this._curChainID = CC[i]._residue._chain._name === this._curChainID ? undefined : CC[i]._residue._chain._name;
       this._compoundIndx++;
       const bbone = this._findBackbone(CC[i]);
       if (bbone) {
@@ -257,13 +259,18 @@ export default class ResiudeSeq {
       residues[i]._index = i;
     }
 
+    complex.forEachChain((a) => {
+      a._finalize();
+    });
+
     complex._fillComponents(false);
   }
 
   _addResidues(namedResidues) {
     const complex = this._complex;
-    const chainID = buildChainID(this._compoundIndx);
+    const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
     const chain = complex.getChain(chainID) || complex.addChain(chainID);
+    chain._residues = [];
     for (let i = 0; i < namedResidues.length; i++) {
       const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
       this._setResiduesForAtoms(namedResidues[i].atomsSet, residue);
