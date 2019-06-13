@@ -2,7 +2,10 @@ import _ from 'lodash';
 import GraphUtils from '../utils/GraphUtils';
 import FSMachine from '../utils/FSMachine';
 import SMILESGenerator from '../utils/SMILESGenerator';
+import AromaticLoopsMarker from './AromaticLoopsMarker';
 import { buildChainID } from '../io/parsers/SDFParser';
+import AutoBond from "./AutoBond";
+import Atom from "./Atom";
 
 class Node {
   constructor(atom = null, alphaC = false, rank = 0) {
@@ -250,20 +253,92 @@ export default class ResiudeSeq {
   }
 
   _finalize(complex) {
-    const residues = complex._residues;
-    for (let i = 0; i < residues.length; ++i) {
-      residues[i]._finalize();
-    }
+    let i;
+    let n;
 
-    for (let i = 0; i < residues.length; ++i) {
-      residues[i]._index = i;
+    const residues = complex._residues;
+    for (i = 0; i < residues.length; ++i) {
+      residues[i]._finalize();
     }
 
     complex.forEachChain((a) => {
       a._finalize();
     });
 
-    complex._fillComponents(false);
+    // WARNING! this MUST be done BEFORE computeBounds is called
+    const { units } = complex;
+    for (i = 0, n = units.length; i < n; ++i) {
+      units[i].finalize();
+    }
+    // try setting first biomolecule by defaults
+    complex.setCurrentUnit(1);
+
+    const residueHash = {};
+    for (i = 0, n = residues.length; i < n; ++i) {
+      const res = residues[i];
+      // This code is extremely dangerous for non-PDB formats
+      residueHash[complex.getUnifiedSerial(
+        res.getChain().getName().charCodeAt(0),
+        res.getSequence(), res.getICode().charCodeAt(0),
+      )] = res;
+    }
+
+    const { structures } = complex;
+    for (i = 0, n = structures.length; i < n; ++i) {
+      structures[i]._finalize([], residueHash, complex);
+    }
+
+    const helices = complex._helices;
+    for (i = 0, n = helices.length; i < n; ++i) {
+      helices[i]._finalize([], residueHash, complex);
+    }
+
+    const sheets = complex._sheets;
+    for (i = 0, n = sheets.length; i < n; ++i) {
+      sheets[i]._finalize([], residueHash, complex);
+    }
+
+    // Update bounding sphere and box
+    complex._computeBounds();
+
+    const atoms = complex._atoms;
+    for (i = 0, n = atoms.length; i < n; ++i) {
+      const currAtom = atoms[i];
+      currAtom._index = i;
+    }
+
+    const autoConnector = new AutoBond(complex);
+    autoConnector.build();
+    autoConnector.destroy();
+
+    const chains = complex._chains;
+    for (i = 0, n = chains.length; i < n; ++i) {
+      chains[i]._index = i;
+    }
+
+    for (i = 0, n = residues.length; i < n; ++i) {
+      residues[i]._index = i;
+    }
+
+    for (i = 0, n = atoms.length; i < n; ++i) {
+      const atom = atoms[i];
+      if (atom.flags & Atom.Flags.HYDROGEN && atom._bonds.length === 1) {
+        const bond = atom._bonds[0];
+        const other = (bond._left !== atom && bond._left) || bond._right;
+        if (other.flags & Atom.Flags.CARBON) {
+          atom.flags |= Atom.Flags.NONPOLARH;
+        }
+      }
+    }
+
+    complex._finalizeBonds();
+    complex._fillComponents(true);
+
+    const marker = new AromaticLoopsMarker(complex);
+    marker.markCycles();
+    marker.detectCycles();
+
+    complex._finalizeMolecules();
   }
 
   _addResidues(namedResidues) {
