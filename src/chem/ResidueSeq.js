@@ -6,6 +6,12 @@ import AromaticLoopsMarker from './AromaticLoopsMarker';
 import { buildChainID } from '../io/parsers/SDFParser';
 import AutoBond from "./AutoBond";
 import Atom from "./Atom";
+import chem from '../chem';
+
+const {
+  Element,
+} = chem;
+
 
 class Node {
   constructor(atom = null, alphaC = false, rank = 0) {
@@ -16,6 +22,8 @@ class Node {
     this.alphaC = alphaC;
   }
 }
+
+const atomNames = ['A', 'B', 'G', 'D', 'E', 'Z', 'H'];
 
 const residuesDict = {
   'CCCCNC(N)N': 'ARG',
@@ -68,6 +76,7 @@ export default class ResiudeSeq {
       const bonds = curNode._bonds;
       for (let i = 0; i < curNode._bonds.length; i++) {
         const nextNode = (bonds[i]._left._index === curNode._index) ? bonds[i]._right : bonds[i]._left;
+
         if (!visited[nextNode._index]) {
           vertsQueue.push(nextNode);
           distances[nextNode._index] = distances[curNode._index] + 1;
@@ -93,6 +102,56 @@ export default class ResiudeSeq {
     return result;
   }
 
+  _fixNewAtomsName1(atoms) {
+    for (let i = 0; i < atoms.length; i++) {
+      atoms[i]._atom._name._name = atoms[i]._atom.element.name;
+    }
+  }
+
+
+  _renameResidueAtoms(residues) {
+    function bfs(start, visited, distances) {
+      distances[start.indx] = 0;
+      const vertsQueue = [];
+      vertsQueue.push(start);
+      while (!_.isEmpty(vertsQueue)) {
+        const node = vertsQueue.shift();
+        const adjacent = node._adj;
+        visited[node.indx] = true;
+        for (let i = 0; i < adjacent.length; i++) {
+          const nextNode = adjacent[i].node; // adjacent is {node: _node, bontType: int}
+          if (!visited[nextNode.indx]) {
+            distances[nextNode.indx] = distances[node.indx] + 1;
+            vertsQueue.push(nextNode);
+          }
+        }
+      }
+    }
+
+    function rename(residue) {
+      const start = _.find(residue.atomsSet, ['alphaC', true]);
+      const visited = Array(residue.atomsSet.length).fill(false);
+      const distances = Array(residue.atomsSet.length).fill(-1);
+      bfs(start, visited, distances);
+
+      const atoms = residue.atomsSet;
+      for (let i = 0; i < atoms.length; i++) {
+        if (distances[atoms[i].indx] !== -1) {
+          atoms[i]._atom._name._name += atomNames[distances[atoms[i].indx]];
+        }
+      }
+
+      for (let i = 0; i < atoms.length; i++) {
+        atoms[i]._atom._role = Element.Role[atoms[i]._atom._name._name];
+      }
+    }
+
+    for (let i = 0; i < residues.length; i++) {
+      this._fixNewAtomsName1(residues[i].atomsSet);
+      rename(residues[i]);
+    }
+  }
+
   defineResidues(complex) {
     this._complex = complex;
     this._graph = new GraphUtils(this._complex._atoms);
@@ -106,6 +165,7 @@ export default class ResiudeSeq {
       if (bbone) {
         const residues = this._getResidues(bbone);
         this._nameResidues(residues);
+        this._renameResidueAtoms(residues);
         this._addResidues(residues);
       }
     }
@@ -231,6 +291,9 @@ export default class ResiudeSeq {
         residueGraph.push(oxygen);
       }
       residueGraph.push(node1, node2);
+      for (let i = 0; i < residueGraph.length; i++) {
+        residueGraph[i].indx = i;
+      }
       result.push({ SMILES: smiles, atomsSet: residueGraph });
     }
 
@@ -343,6 +406,7 @@ export default class ResiudeSeq {
 
   _addResidues(namedResidues) {
     const complex = this._complex;
+    complex._residues = [];
     const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
     const chain = complex.getChain(chainID) || complex.addChain(chainID);
     chain._residues = [];
@@ -350,6 +414,7 @@ export default class ResiudeSeq {
       const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
       this._setResiduesForAtoms(namedResidues[i].atomsSet, residue);
       namedResidues[i].atomsSet.forEach(node => residue._atoms.push(node._atom));
+      residue._atoms.sort((a, b) => a._index - b._index);
     }
 
     this._finalize(complex);
