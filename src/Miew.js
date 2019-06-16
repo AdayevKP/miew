@@ -3876,9 +3876,7 @@ Miew.prototype.resplit = function (complexName) {
   RS.defineResidues(complex);
 
   visual._reprList.forEach((rep) => {
-    if (rep.colorer.id === 'RT' || rep.mode.id === 'CA' || rep.mode.id === 'TR' ||  rep.mode.id === 'TU') {
-      rep.needsRebuild = true;
-    }
+    rep.needsRebuild = true;
   });
 };
 

@@ -2,11 +2,9 @@ import _ from 'lodash';
 import GraphUtils from '../utils/GraphUtils';
 import FSMachine from '../utils/FSMachine';
 import SMILESGenerator from '../utils/SMILESGenerator';
-import AromaticLoopsMarker from './AromaticLoopsMarker';
 import { buildChainID } from '../io/parsers/SDFParser';
-import AutoBond from "./AutoBond";
-import Atom from "./Atom";
 import chem from '../chem';
+import AutoBond from './AutoBond';
 
 const {
   Element,
@@ -158,6 +156,12 @@ export default class ResiudeSeq {
 
     const CC = this._findConnectedComponents();
 
+    if (CC.length === 0) {
+      return false;
+    }
+
+
+    const allResidues = [];
     for (let i = 0; i < CC.length; i++) {
       this._curChainID = CC[i]._residue._chain._name === this._curChainID ? undefined : CC[i]._residue._chain._name;
       this._compoundIndx++;
@@ -166,10 +170,17 @@ export default class ResiudeSeq {
         const residues = this._getResidues(bbone);
         this._nameResidues(residues);
         this._renameResidueAtoms(residues);
-        this._addResidues(residues);
+        allResidues.push(...residues);
+      } else {
+        return false;
       }
     }
 
+    complex._residues = [];
+    complex._components = [];
+    complex._chains = [];
+    complex._molecules = [];
+    this._addResidues(allResidues);
     this._complex = null;
     this._graph = null;
 
@@ -318,6 +329,25 @@ export default class ResiudeSeq {
   _finalize(complex) {
     let i;
     let n;
+    const bonds = complex._bonds;
+    /*
+    for (i = bonds.length - 1; i >= 0; i--) {
+      const bond = bonds[i];
+      if (bond._left === null || bond._right === null || bond._left === undefined || bond._right === undefined) {
+        bonds.splice(i, 1);
+      }
+    }
+*/
+    for (i = bonds.length - 1; i >= 0; i--) {
+      const bond = bonds[i];
+      if (bond._left === null || bond._right === null) {
+        bonds.splice(i, 1);
+      } else {
+        bond._left._bonds.push(bond);
+        bond._right._bonds.push(bond);
+        complex._bonds.push(bond);
+      }
+    }
 
     const residues = complex._residues;
     for (i = 0; i < residues.length; ++i) {
@@ -383,33 +413,15 @@ export default class ResiudeSeq {
       residues[i]._index = i;
     }
 
-    for (i = 0, n = atoms.length; i < n; ++i) {
-      const atom = atoms[i];
-      if (atom.flags & Atom.Flags.HYDROGEN && atom._bonds.length === 1) {
-        const bond = atom._bonds[0];
-        const other = (bond._left !== atom && bond._left) || bond._right;
-        if (other.flags & Atom.Flags.CARBON) {
-          atom.flags |= Atom.Flags.NONPOLARH;
-        }
-      }
-    }
-
-    complex._finalizeBonds();
     complex._fillComponents(true);
-
-    const marker = new AromaticLoopsMarker(complex);
-    marker.markCycles();
-    marker.detectCycles();
 
     complex._finalizeMolecules();
   }
 
   _addResidues(namedResidues) {
     const complex = this._complex;
-    complex._residues = [];
     const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
     const chain = complex.getChain(chainID) || complex.addChain(chainID);
-    chain._residues = [];
     for (let i = 0; i < namedResidues.length; i++) {
       const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
       this._setResiduesForAtoms(namedResidues[i].atomsSet, residue);
@@ -417,6 +429,12 @@ export default class ResiudeSeq {
       residue._atoms.sort((a, b) => a._index - b._index);
     }
 
+    const residues = complex._residues;
+    for (let i = residues.length - 1; i >= 0; i--) {
+      if (residues[i] === undefined || residues[i] === null || _.isEmpty(residues[i])) {
+        residues.splice(i, 1);
+      }
+    }
     this._finalize(complex);
   }
 }
