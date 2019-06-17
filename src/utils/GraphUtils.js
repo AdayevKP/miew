@@ -10,7 +10,6 @@ export default class GraphUtils {
     this._automat = null;
     this._visited = [];
     this._newStart = {};
-
   }
 
   traverse(startNode) {
@@ -23,12 +22,12 @@ export default class GraphUtils {
     vertsStack.push({ node: startNode, auto: automat });
     let lastNode2 = {};
 
-    this._distances[startNode._index]++;
     while (!_.isEmpty(vertsStack)) {
       const data = vertsStack.pop();
       const Node = data.node;
       automat = data.auto;
-
+      let haveway = false;
+      let del = false;
       //let resAut = automat;
       const bonds = Node._bonds;
       this._visited[Node._index] = true;
@@ -36,10 +35,14 @@ export default class GraphUtils {
         const nextNode = (bonds[i]._left._index === Node._index) ? bonds[i]._right : bonds[i]._left;
         const autClone = automat.clone();
         const answer = autClone.eatNode(nextNode);
+        if (!answer) {
+          del = true;
+        }
         if (!this._visited[nextNode._index] && answer) {
           if (autClone.haveOutput()) {
             lastNode = nextNode;
           }
+          haveway = true;
           this._distances[nextNode._index] = this._distances[Node._index] + 1;
           this._parents[nextNode._index] = { node: nextNode, parent: Node._index };
           vertsStack.push({ node: nextNode, auto: autClone });
@@ -48,22 +51,37 @@ export default class GraphUtils {
           lastNode2 = nextNode;
         }
       }
+
+      if (del || haveway || !automat._havePatern || (automat._curState !== 'NCC' && automat._curState !== 'CCN') || automat._resultWord.length <=3) {
+        _.remove(automats, a => a === automat);
+      }
     }
 
     automats.sort((a, b) => a._resultWord.length - b._resultWord.length);
+
+    if (automats.length > 0) {
+      //no
+    }
     this._automat = automats.pop();
 
-    const maxIndx = this._distances.indexOf(Math.max(...this._distances));
+    const result = [];
+    for (let i = 0; i < automats.length; i++) {
+      result.push(automats[i]._resultWord);
+    }
+
+    this._automat = result;
+
+    //const maxIndx = this._distances.indexOf(Math.max(...this._distances));
 
     this._newStart = this._newStart._index !== lastNode2._index ? lastNode2 : {};
 
-    for (let i = 0; i < this._vertices.length; i++) {
-      if (this._vertices[i]._index === maxIndx) {
-        this._newStart = this._vertices[i];
-        return this._newStart;
-      }
-    }
-    return null;
+    //for (let i = 0; i < this._vertices.length; i++) {
+    //  if (this._vertices[i]._index === maxIndx) {
+    //   this._newStart = this._vertices[i];
+    //  }
+    //}
+    return lastNode;
+
   }
 
   traverse1(startNode) {
@@ -71,10 +89,10 @@ export default class GraphUtils {
     const vertsStack = [];
 
     let automat = new FSMachine();
+    this._distances[startNode._index]++;
     vertsStack.push({ node: startNode, auto: automat });
 
     while (!_.isEmpty(vertsStack)) {
-      let fails = 0;
       const data = vertsStack.pop();
       const Node = data.node;
       automat = data.auto;
@@ -84,17 +102,13 @@ export default class GraphUtils {
         const nextNode = (bonds[i]._left._index === Node._index) ? bonds[i]._right : bonds[i]._left;
         let autClone = automat.clone();
         if (autClone.eatNode(nextNode) === false) {
-          fails++;
+          result.push(nextNode);
           autClone = new FSMachine();
           autClone.eatNode(nextNode);
         }
         if (!this._visited[nextNode._index]) {
           vertsStack.push({ node: nextNode, auto: autClone });
         }
-      }
-
-      if (fails === Node._bonds.length) {
-        result.push(Node);
       }
     }
 
@@ -120,7 +134,7 @@ export default class GraphUtils {
     this._startNode = startNode;
     this._parents[this._startNode._index] = { node: this._startNode, parent: this._startNode._index };
     this._visited = new Array(this._vertices.length).fill(false);
-    this._distances = new Array(this._vertices.length).fill(-1);
+    this._distances = new Array(this._vertices.length).fill(false);
 
     start = startNode;
     if (type === 'one') {
@@ -161,7 +175,7 @@ export default class GraphUtils {
 
   getAutomatPath() {
     if (this._automat) {
-      return this._automat.getResult();
+      return [];//this._automat.getResult();
     }
 
     return [];

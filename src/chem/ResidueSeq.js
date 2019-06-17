@@ -82,22 +82,14 @@ export default class ResiudeSeq {
       }
     }
 
-    //const maxIndx = distances.indexOf(Math.max(...distances));
-
-    let maxIndx = -1;
-    let max = 0;
-    for (let i = 0; i < distances.length; i++) {
-      if (distances[i] > max) {
-        max = distances[i];
-        maxIndx = i;
-      }
-    }
+    const maxIndx = distances.indexOf(Math.max(...distances));
     for (let i = 0; i < vertices.length; i++) {
       if (vertices._index === maxIndx) {
         return vertices[i];
       }
     }
     return null;
+    //return vertices.find(V => V._index === maxIndx);
   }
 
   _findConnectedComponents() {
@@ -108,7 +100,6 @@ export default class ResiudeSeq {
     while (startAtom) {
       result.push(startAtom);
       this._bfs(startAtom, visited);
-
       let indx = -1;
       for (let i = 0; i < visited.length; i++) {
         if (visited[i] === false) {
@@ -119,7 +110,7 @@ export default class ResiudeSeq {
       if (indx === -1) {
         startAtom = false;
       } else {
-        startAtom = atoms[indx];
+        startAtom = atoms[indx];//atoms[visited.indexOf(false)];
       }
     }
 
@@ -188,10 +179,6 @@ export default class ResiudeSeq {
 
 
     const allResidues = [];
-    complex._residues = [];
-    complex._components = [];
-    complex._chains = [];
-    complex._molecules = [];
     for (let i = 0; i < CC.length; i++) {
       this._curChainID = CC[i]._residue._chain._name === this._curChainID ? undefined : CC[i]._residue._chain._name;
       this._compoundIndx++;
@@ -200,12 +187,17 @@ export default class ResiudeSeq {
         const residues = this._getResidues(bbone);
         this._nameResidues(residues);
         this._renameResidueAtoms(residues);
-        this._addResidues(residues);
+        allResidues.push(...residues);
       } else {
         return false;
       }
     }
 
+    complex._residues = [];
+    complex._components = [];
+    complex._chains = [];
+    complex._molecules = [];
+    this._addResidues(allResidues);
     this._complex = null;
     this._graph = null;
 
@@ -215,36 +207,48 @@ export default class ResiudeSeq {
   _tryToFindBackbone(startNode, graph) {
     const newGraph = new GraphUtils(graph._vertices);
 
-    //const bboneStarts = newGraph.DFS4BBone(startNode);
+    const bboneStarts = newGraph.DFS(startNode, 'all');
 
-    //if (bboneStarts === null) {
-    //  return [];
-    //}
+    if (bboneStarts === null) {
+      return [];
+    }
 
-    //const allBB = [];
+    const allBB = [];
 
-    //for (let i = 0; i < bboneStarts.length; i++) {
+    let second = 0;
+    for (let i = 0; i < bboneStarts.length; i++) {
+      const FSM = new FSMachine();
+      second = graph.DFS(bboneStarts[i]);
+      let path = graph.getPath(second);
+      FSM.eatPath(path);
+      path = FSM.getResult();
+      allBB.push(..._.difference(path, allBB));
+    }
+/*
     const FSM = new FSMachine();
-    const first = graph.DFS(startNode);
-    const second = graph.DFS(first);
-    const path = graph.getPath(second);
+    const first = graph.DFS(second);
+    second = graph.DFS(first);
+    let path = graph.getPath(second);
     FSM.eatPath(path);
-    return FSM.getResult();
-    //allBB.push(..._.difference(path, allBB));
-    //}
+    path = FSM.getResult();
+    if (_.isEmpty(_.intersection(path, allBB))) {
+      allBB.push(...path);
+    } */
+    //const first = graph.DFS(startNode);
+    //const second = graph.DFS(first);
+    //const path = graph.getPath(second);
+    //const remove = path.length % 3;
+    //path.splice(path.length - remove, remove);
 
-    //return allBB;
+    return allBB;
   }
 
   _isBackbone(path) {
-    let FSM = new FSMachine();
-    FSM.eatPath(path);
-    path = FSM.getResult();
     if (path.length % 3 !== 0 || path.length === 0) {
       return null;
     }
 
-    FSM = new FSMachine();
+    const FSM = new FSMachine();
     FSM.eatPath(path);
     const bbone = FSM.getResult();
 
@@ -272,21 +276,12 @@ export default class ResiudeSeq {
   _backbondIterativeSearch1(startAtom, graph) {
     let newStartAtom = startAtom;
     const visitedVerts = [];
-    let path = [];
-    while (!visitedVerts.includes(newStartAtom)) {
+    let path = [];//graph.getAutomatPath();
+    while (!this._isBackbone(path) && !visitedVerts.includes(newStartAtom)) {
       visitedVerts.push(newStartAtom);
       newStartAtom = this._bfs(newStartAtom);
+      path = this._tryToFindBackbone(newStartAtom, graph);
     }
-
-    const result = [];
-    for (let i = 0; i < visitedVerts.length; i++) {
-      const newGraph = new GraphUtils(this._complex._atoms);
-      path = this._tryToFindBackbone(visitedVerts[i], newGraph);
-      if (this._isBackbone(path)) {
-        result.push(...path);
-      }
-    }
-    path = result;
 
     if (!this._isBackbone(path)) {
       path = this._backbondIterativeSearch2(startAtom, graph);
@@ -482,10 +477,8 @@ export default class ResiudeSeq {
 
   _addResidues(namedResidues) {
     const complex = this._complex;
-    const chainID = buildChainID(this._compoundIndx);
+    const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
     const chain = complex.getChain(chainID) || complex.addChain(chainID);
-    //const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
-    //const chain = complex.getChain(chainID) || complex.addChain(chainID);
     for (let i = 0; i < namedResidues.length; i++) {
       const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
       this._setResiduesForAtoms(namedResidues[i].atomsSet, residue);
