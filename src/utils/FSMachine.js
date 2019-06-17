@@ -64,7 +64,7 @@ export default class FSMachine {
 
   _initialState(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'N' || (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node))) {
+    if (Node.element.name === 'N' || (Node.element.name === 'C' && this._haveOxy(Node))) {
       this._changeState(Node.element.name, Node);
     }
     return true;
@@ -99,10 +99,10 @@ export default class FSMachine {
 
   _Nstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C') {
-      this._changeState('NC', Node);
-    } else if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
+    if (Node.element.name === 'C' && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
+    } else if (Node.element.name === 'C') {
+      this._changeState('NC', Node);
     } else {
       return this._dropState();
     }
@@ -111,7 +111,7 @@ export default class FSMachine {
 
   _NCstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
+    if (Node.element.name === 'C' && this._haveOxy(Node)) {
       this._changeState('NCC', Node);
       this._pushBackResult();
     } else if (Node.element.name === 'C') {
@@ -127,7 +127,7 @@ export default class FSMachine {
     const bonds = Node._bonds.length;
     if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
-    } else if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
+    } else if (Node.element.name === 'C' && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else if (Node.element.name === 'C') {
       this._currentSubWord.shift();
@@ -141,9 +141,9 @@ export default class FSMachine {
 
   _Cstate(Node) {
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds.length === 3 && this._haveOxy(Node)) {
+    if (Node.element.name === 'C' && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
-    } if (Node.element.name === 'C') {
+    } else if (Node.element.name === 'C') {
       this._changeState('CC', Node);
     } else if (Node.element.name === 'N') {
       this._changeState('N', Node, true);
@@ -158,7 +158,7 @@ export default class FSMachine {
     if (Node.element.name === 'N') {
       this._changeState('CCN', Node);
       this._pushBackResult();
-    } else if (Node.element.name === 'C' && bonds.length === 3 && this._haveOxy(Node)) {
+    } else if (Node.element.name === 'C' && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else {
       return this._dropState();
@@ -169,7 +169,7 @@ export default class FSMachine {
   _CCNstate(Node) {
     this._pushBackResult();
     const bonds = Node._bonds.length;
-    if (Node.element.name === 'C' && bonds === 3 && this._haveOxy(Node)) {
+    if (Node.element.name === 'C' && this._haveOxy(Node)) {
       this._changeState('C', Node, true);
     } else if (Node.element.name === 'C') {
       this._currentSubWord.shift();
@@ -195,6 +195,11 @@ export default class FSMachine {
       this.eatNode(path[i]);
     }
   }
+
+  haveOutput() {
+    return this._curState === 'CCN' || this._curState === 'NCC';
+  }
+
 
   getResult() {
     const intersec = _.intersectionWith(this._resultWord, this._currentSubWord, (a, b) => a._index === b._index);

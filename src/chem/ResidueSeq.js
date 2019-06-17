@@ -177,9 +177,6 @@ export default class ResiudeSeq {
   }
 
   defineResidues(complex) {
-    const FSM = new FSMachine();
-    FSM.eatPath('sher');
-    /*
     this._complex = complex;
     this._graph = new GraphUtils(this._complex._atoms);
 
@@ -213,7 +210,6 @@ export default class ResiudeSeq {
     this._graph = null;
 
     return true;
-    */
   }
 
   _tryToFindBackbone(startNode, graph) {
