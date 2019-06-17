@@ -28,7 +28,7 @@ const residuesDict = {
   'CCC(N)O': 'ASN',
   'CCC(O)O': 'ASP',
   CCS: 'CYS',
-  'CCCC(O)O': 'GLY',
+  'CCCC(O)O': 'GLU',
   'CCCC(N)O': 'GLN',
   C: 'GLY',
   CCC1CNCN1: 'HIS',
@@ -82,8 +82,22 @@ export default class ResiudeSeq {
       }
     }
 
-    const maxIndx = distances.indexOf(Math.max(...distances));
-    return vertices.find(V => V._index === maxIndx);
+    //const maxIndx = distances.indexOf(Math.max(...distances));
+
+    let maxIndx = -1;
+    let max = 0;
+    for (let i = 0; i < distances.length; i++) {
+      if (distances[i] > max) {
+        max = distances[i];
+        maxIndx = i;
+      }
+    }
+    for (let i = 0; i < vertices.length; i++) {
+      if (vertices._index === maxIndx) {
+        return vertices[i];
+      }
+    }
+    return null;
   }
 
   _findConnectedComponents() {
@@ -94,7 +108,19 @@ export default class ResiudeSeq {
     while (startAtom) {
       result.push(startAtom);
       this._bfs(startAtom, visited);
-      startAtom = atoms[visited.indexOf(false)];
+
+      let indx = -1;
+      for (let i = 0; i < visited.length; i++) {
+        if (visited[i] === false) {
+          indx = i;
+        }
+      }
+
+      if (indx === -1) {
+        startAtom = false;
+      } else {
+        startAtom = atoms[indx];
+      }
     }
 
     return result;
@@ -151,6 +177,9 @@ export default class ResiudeSeq {
   }
 
   defineResidues(complex) {
+    const FSM = new FSMachine();
+    FSM.eatPath('sher');
+    /*
     this._complex = complex;
     this._graph = new GraphUtils(this._complex._atoms);
 
@@ -162,6 +191,10 @@ export default class ResiudeSeq {
 
 
     const allResidues = [];
+    complex._residues = [];
+    complex._components = [];
+    complex._chains = [];
+    complex._molecules = [];
     for (let i = 0; i < CC.length; i++) {
       this._curChainID = CC[i]._residue._chain._name === this._curChainID ? undefined : CC[i]._residue._chain._name;
       this._compoundIndx++;
@@ -170,53 +203,97 @@ export default class ResiudeSeq {
         const residues = this._getResidues(bbone);
         this._nameResidues(residues);
         this._renameResidueAtoms(residues);
-        allResidues.push(...residues);
+        this._addResidues(residues);
       } else {
         return false;
       }
     }
 
-    complex._residues = [];
-    complex._components = [];
-    complex._chains = [];
-    complex._molecules = [];
-    this._addResidues(allResidues);
     this._complex = null;
     this._graph = null;
 
     return true;
+    */
   }
 
   _tryToFindBackbone(startNode, graph) {
+    const newGraph = new GraphUtils(graph._vertices);
+
+    //const bboneStarts = newGraph.DFS4BBone(startNode);
+
+    //if (bboneStarts === null) {
+    //  return [];
+    //}
+
+    //const allBB = [];
+
+    //for (let i = 0; i < bboneStarts.length; i++) {
     const FSM = new FSMachine();
     const first = graph.DFS(startNode);
     const second = graph.DFS(first);
     const path = graph.getPath(second);
     FSM.eatPath(path);
     return FSM.getResult();
+    //allBB.push(..._.difference(path, allBB));
+    //}
+
+    //return allBB;
   }
 
   _isBackbone(path) {
+    let FSM = new FSMachine();
+    FSM.eatPath(path);
+    path = FSM.getResult();
     if (path.length % 3 !== 0 || path.length === 0) {
-      return false;
+      return null;
     }
 
-    const FSM = new FSMachine();
+    FSM = new FSMachine();
     FSM.eatPath(path);
     const bbone = FSM.getResult();
 
     return path.length === bbone.length;
   }
 
-  _backbondIterativeSearch(startAtom, graph) {
+  _backbondIterativeSearch2(startAtom, graph) {
     let newStartAtom = startAtom;
     const visitedVerts = [];
+    const allPath = [];
     let path = graph.getAutomatPath();
-    while (!this._isBackbone(path) && !visitedVerts.includes(newStartAtom)) {
+    while (!visitedVerts.includes(newStartAtom)) {
+      if (this._isBackbone(path)) {
+        allPath.push(..._.difference(path, allPath));
+      }
       visitedVerts.push(newStartAtom);
       newStartAtom = this._bfs(newStartAtom);
       this._tryToFindBackbone(newStartAtom, graph);
       path = graph.getAutomatPath();
+    }
+
+    return allPath;
+  }
+
+  _backbondIterativeSearch1(startAtom, graph) {
+    let newStartAtom = startAtom;
+    const visitedVerts = [];
+    let path = [];
+    while (!visitedVerts.includes(newStartAtom)) {
+      visitedVerts.push(newStartAtom);
+      newStartAtom = this._bfs(newStartAtom);
+    }
+
+    const result = [];
+    for (let i = 0; i < visitedVerts.length; i++) {
+      const newGraph = new GraphUtils(this._complex._atoms);
+      path = this._tryToFindBackbone(visitedVerts[i], newGraph);
+      if (this._isBackbone(path)) {
+        result.push(...path);
+      }
+    }
+    path = result;
+
+    if (!this._isBackbone(path)) {
+      path = this._backbondIterativeSearch2(startAtom, graph);
     }
 
     return path;
@@ -227,7 +304,7 @@ export default class ResiudeSeq {
     let path = this._tryToFindBackbone(startAtom, graph);
 
     if (!this._isBackbone(path)) {
-      path = this._backbondIterativeSearch(startAtom, graph);
+      path = this._backbondIterativeSearch1(startAtom, graph);
     }
     return this._isBackbone(path) ? path : [];
   }
@@ -330,22 +407,11 @@ export default class ResiudeSeq {
     let i;
     let n;
     const bonds = complex._bonds;
-    /*
-    for (i = bonds.length - 1; i >= 0; i--) {
-      const bond = bonds[i];
-      if (bond._left === null || bond._right === null || bond._left === undefined || bond._right === undefined) {
-        bonds.splice(i, 1);
-      }
-    }
-*/
+
     for (i = bonds.length - 1; i >= 0; i--) {
       const bond = bonds[i];
       if (bond._left === null || bond._right === null) {
         bonds.splice(i, 1);
-      } else {
-        bond._left._bonds.push(bond);
-        bond._right._bonds.push(bond);
-        complex._bonds.push(bond);
       }
     }
 
@@ -420,8 +486,10 @@ export default class ResiudeSeq {
 
   _addResidues(namedResidues) {
     const complex = this._complex;
-    const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
+    const chainID = buildChainID(this._compoundIndx);
     const chain = complex.getChain(chainID) || complex.addChain(chainID);
+    //const chainID = _.isUndefined(this._curChainID) ? buildChainID(this._compoundIndx) : this._curChainID;
+    //const chain = complex.getChain(chainID) || complex.addChain(chainID);
     for (let i = 0; i < namedResidues.length; i++) {
       const residue = chain.addResidue(namedResidues[i].name, 1, ' ');
       this._setResiduesForAtoms(namedResidues[i].atomsSet, residue);

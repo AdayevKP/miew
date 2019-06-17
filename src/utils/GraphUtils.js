@@ -9,24 +9,21 @@ export default class GraphUtils {
     this._startNode = null;
     this._automat = null;
     this._visited = [];
+    this._newStart = {};
+
   }
 
-  DFS(startNode) {
-    if (!startNode) {
-      return null;
-    }
+  traverse(startNode) {
     const vertsStack = [];
-    this._visited = new Array(this._vertices.length).fill(false);
-    this._distances = new Array(this._vertices.length).fill(-1);
-    this._startNode = startNode;
-    this._parents[this._startNode._index] = { node: this._startNode, parent: this._startNode._index };
-
+    let lastNode = null;
     const automats = [];
 
     let automat = new FSMachine();
     automats.push(automat);
     vertsStack.push({ node: startNode, auto: automat });
+    let lastNode2 = {};
 
+    this._distances[startNode._index]++;
     while (!_.isEmpty(vertsStack)) {
       const data = vertsStack.pop();
       const Node = data.node;
@@ -38,56 +35,108 @@ export default class GraphUtils {
       for (let i = 0; i < Node._bonds.length; i++) {
         const nextNode = (bonds[i]._left._index === Node._index) ? bonds[i]._right : bonds[i]._left;
         const autClone = automat.clone();
-        if (!this._visited[nextNode._index] && autClone.eatNode(nextNode)) {
+        const answer = autClone.eatNode(nextNode);
+        if (!this._visited[nextNode._index] && answer) {
+          if (autClone.haveOutput()) {
+            lastNode = nextNode;
+          }
           this._distances[nextNode._index] = this._distances[Node._index] + 1;
           this._parents[nextNode._index] = { node: nextNode, parent: Node._index };
           vertsStack.push({ node: nextNode, auto: autClone });
           automats.push(autClone);
-          //const newAut = doDfs.call(this, nextNode, autClone);
-          //resAut = newAut._resultWord > resAut._resultWord ? newAut : resAut;
+        } else if (answer === false) {
+          lastNode2 = nextNode;
         }
       }
     }
 
     automats.sort((a, b) => a._resultWord.length - b._resultWord.length);
     this._automat = automats.pop();
-    const maxIndx = this._distances.indexOf(Math.max(...this._distances));
-    return this._vertices.find(V => V._index === maxIndx);
-  }
-/*
-  DFS(startNode) {
-    if (!startNode) {
-      return null;
-    }
 
-    this._startNode = startNode;
-    this._parents[this._startNode._index] = { node: this._startNode, parent: this._startNode._index };
-    function doDfs(Node, automat) {
-      let resAut = automat;
-      this._visited[Node._index] = true;
+    const maxIndx = this._distances.indexOf(Math.max(...this._distances));
+
+    this._newStart = this._newStart._index !== lastNode2._index ? lastNode2 : {};
+
+    for (let i = 0; i < this._vertices.length; i++) {
+      if (this._vertices[i]._index === maxIndx) {
+        this._newStart = this._vertices[i];
+        return this._newStart;
+      }
+    }
+    return null;
+  }
+
+  traverse1(startNode) {
+    const result = [];
+    const vertsStack = [];
+
+    let automat = new FSMachine();
+    vertsStack.push({ node: startNode, auto: automat });
+
+    while (!_.isEmpty(vertsStack)) {
+      let fails = 0;
+      const data = vertsStack.pop();
+      const Node = data.node;
+      automat = data.auto;
       const bonds = Node._bonds;
+      this._visited[Node._index] = true;
       for (let i = 0; i < Node._bonds.length; i++) {
         const nextNode = (bonds[i]._left._index === Node._index) ? bonds[i]._right : bonds[i]._left;
-        const autClone = automat.clone();
-        if (!this._visited[nextNode._index] && autClone.eatNode(nextNode)) {
-          this._distances[nextNode._index] = this._distances[Node._index] + 1;
-          this._parents[nextNode._index] = { node: nextNode, parent: Node._index };
-          const newAut = doDfs.call(this, nextNode, autClone);
-          resAut = newAut._resultWord > resAut._resultWord ? newAut : resAut;
+        let autClone = automat.clone();
+        if (autClone.eatNode(nextNode) === false) {
+          fails++;
+          autClone = new FSMachine();
+          autClone.eatNode(nextNode);
+        }
+        if (!this._visited[nextNode._index]) {
+          vertsStack.push({ node: nextNode, auto: autClone });
         }
       }
 
-      return resAut;
+      if (fails === Node._bonds.length) {
+        result.push(Node);
+      }
     }
 
-    this._distances = new Array(this._vertices.length).fill(-1);
-    this._visited = new Array(this._vertices.length).fill(false);
-    const automat = new FSMachine();
-    this._automat = doDfs.call(this, startNode, automat);
-    const maxIndx = this._distances.indexOf(Math.max(...this._distances));
-    return this._vertices.find(V => V._index === maxIndx);
+    return result;
   }
-*/
+
+  DFS4BBone(startNode) {
+    if (!startNode) {
+      return null;
+    }
+    this._visited = new Array(this._vertices.length).fill(false);
+    this._startNode = startNode;
+
+    return this.traverse1(startNode);
+  }
+
+
+  DFS(startNode, type = 'one') {
+    let start = null;
+    if (!startNode) {
+      return null;
+    }
+    this._startNode = startNode;
+    this._parents[this._startNode._index] = { node: this._startNode, parent: this._startNode._index };
+    this._visited = new Array(this._vertices.length).fill(false);
+    this._distances = new Array(this._vertices.length).fill(-1);
+
+    start = startNode;
+    if (type === 'one') {
+      return this.traverse(start);
+    }
+    const result = [];
+    while (!_.isEmpty(start)) {
+      const newend = this.traverse(start);
+      if (newend !== null) {
+        result.push(newend);
+      }
+      start = this._newStart;
+    }
+
+    return result;
+  }
 
   getPath(endNode) {
     let curNode = endNode;
